@@ -1,2 +1,2 @@
 # mem_mgr
-Memory Manager allows users to directly access (read/write) memory using the interfaces provided by the Platform Support Package (PSP) and Operating System Abstraction Layer (OSAL). 
+Memory Manager allows users to directly access (read/write) memory and should only be used by flight software (FSW) development and maintenance engineers.  Users are responsible for not corrupting the FSW image nor damaging hardware through memory mapped interfaces. MEM_MGR accesses memory and address symbols through the interfaces provided by the Platform Support Package (PSP) and Operating System Abstraction Layer (OSAL). 
