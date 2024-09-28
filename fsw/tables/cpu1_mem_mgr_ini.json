@@ -1,0 +1,40 @@
+{
+   "title": "Hello World initialization file",
+   "description": ["Define runtime configurations",
+                    "These parameters support file-based memory fill, load and dump operations",
+                    "MEM_FILE_xxx_BLOCK_SIZE: Values must be less than MEM_FILE_TASK_FILE_BLOCK_SIZE defined in app_cfg.h",
+                    "CFE_FILE_HDR_SUBTYPE: Identify MEM_MGR files. 1078807872 = 0x404D4D40 => @MM@ in ASCII",
+                    "FILE_TASK_BLOCK_LIMIT: Number of consecutive CPU intensive file-based tasks to perform before delaying",
+                    "FILE_TASK_BLOCK_DELAY: Delay (in MS) between task file blocks of execution."],
+   "config": {
+      
+      "APP_CFE_NAME": "MEM_MGR",
+      "APP_PERF_ID":  127,
+          
+      "APP_CMD_PIPE_DEPTH": 5,
+      "APP_CMD_PIPE_NAME":  "MEM_MGR_CMD",
+
+      "MEM_MGR_CMD_TOPICID": 0,
+      "BC_SCH_4_SEC_TOPICID": 0,
+      "MEM_MGR_STATUS_TLM_TOPICID": 0,
+
+      "MEM_FILE_LOAD_BLOCK_SIZE": 200,
+      "MEM_FILE_DUMP_BLOCK_SIZE": 200,
+      "MEM_FILE_FILL_BLOCK_SIZE": 200,
+
+      "MEM_FILE_CFE_HDR_DESCR": "MEM_MGR Dump File",
+      "MEM_FILE_CFE_HDR_SUBTYPE": 1078807872,
+      "MEM_FILE_TASK_BLOCK_LIMIT": 16,
+      "MEM_FILE_TASK_BLOCK_DELAY": 20,
+      
+      "MEM_FILE_CHILD_NAME":        "MEM_MGR_FILE",
+      "MEM_FILE_CHILD_STACK_SIZE":  20480,
+      "MEM_FILE_CHILD_PRIORITY":    205,
+      "MEM_FILE_CHILD_PERF_ID":     999,
+      
+      "MEM_TLM_CHILD_NAME":        "MEM_MGR_TLM",
+      "MEM_TLM_CHILD_STACK_SIZE":  20480,
+      "MEM_TLM_CHILD_PRIORITY":    50
+
+   }
+}

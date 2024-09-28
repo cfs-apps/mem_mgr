@@ -1,0 +1,29 @@
+{ "app": {
+   
+   "title": "MEM_MGR",
+   "version": "1.0.0",
+   "supplier": "bitValence",
+   "url": "",
+
+   "description": [
+      "This app was generated using the hello-world template"
+   ],
+
+   "cfs": {
+      "cfe-type": "CFE_APP",
+      "obj-file": "mem_mgr",
+      "entry-symbol": "MEM_MGR_AppMain",
+      "name": "MEM_MGR",
+      "priority": 70,
+      "stack": 32768,
+      "load_addr": 0,
+      "exception-action": 0,
+      "app-framework": "osk",
+      "tables": ["hi_world_ini.json"]
+   },
+
+   "requires": ["app_c_fw"]
+   
+}}
+
+
