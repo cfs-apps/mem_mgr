@@ -3,11 +3,13 @@
    "title": "MEM_MGR",
    "version": "1.0.0",
    "supplier": "bitValence",
-   "url": "",
+   "url": "https://github.com/cfs-apps/mem_mgr",
 
    "description": [
-      "This app was generated using the hello-world template"
-   ],
+      "Provides an interface for users to directly access (read/write) memory. This should",
+      "only be used by flight software (FSW) development and maintenance engineers. Users",
+      "are responsible for not corrupting the FSW image nor damaging hardware through memory",
+      "mapped interfaces. "],
 
    "cfs": {
       "cfe-type": "CFE_APP",
@@ -19,7 +21,7 @@
       "load_addr": 0,
       "exception-action": 0,
       "app-framework": "osk",
-      "tables": ["hi_world_ini.json"]
+      "tables": ["mem_mgr_ini.json"]
    },
 
    "requires": ["app_c_fw"]
