@@ -1,0 +1,59 @@
+{
+   "title": "Memory Manager Dwell Table",
+   "description": ["Define runtime configuration parameters. The following",
+                   "EDS configuration impact this table:",
+                   "MEM_MGR_DWELL_NAME_LEN: Number of characters in a dwell name",
+                   "MEM_MGR_DWELL_ID_CNT: Number of dwell tables/telemetry messages",
+                   "MEM_MGR_DWELL_ENTRIES: Number of entries per dwell table",
+                   "Every entry must be defined in the default table. During runtime",
+                   "after the default table has been loaded, partial entry lists can",
+                   "be supplied, however every table must be present.",
+                   "Valid non-null entry requirements: ",
+                   " - length: Must be 1, 2, or 4",
+                   " - delay: Any uint16 value. 0 runs every execution cycle",
+                   " - address:",
+                   "    - If symbol is an empty string then offseet is the address",
+                   "    - Sum of symbol+offset must be a valid acessible address",
+                   "    - If length is 2 then address must be even",
+                   "    - If length is 4 then address must be evenly divisible by 4",
+                   ""],
+   
+
+   "topic-id-map": {
+   
+      "start": true,
+      "MEM_MGR_DWELL_1_TLM_TOPICID": "topic-id-1",
+      "MEM_MGR_DWELL_2_TLM_TOPICID": "topic-id-2",      
+      "end": true
+
+   },
+   
+   "dwell": [
+      {
+         "id": 1,
+         "name": "mem_maint_ex",
+         "topic-id-1": 2155,
+         "topic-id": 2155,
+         "enabled": "false",
+         "entry": [
+            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  0}},
+            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  4}},
+            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  8}},
+            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset": 12}}
+         ]
+      },
+      {
+         "id": 2,
+         "name": "null",
+         "topic-id-2": 2156,
+         "topic-id": 2156,
+         "enabled": "false",
+         "entry": [
+            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
+            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
+            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
+            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}}
+         ]
+      }
+   ]
+}

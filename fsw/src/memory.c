@@ -663,7 +663,7 @@ static bool Peek(MEM_MGR_CpuAddr_Atom_t CpuAddr, MEM_MGR_MemType_Enum_t MemType,
          break;
    } /* End mem size switch */
    
-   //TODO: Set peek status in the main command function. Make all commands consistent. Think about sucess event message  
+   //TODO: Set peek status in the main command function. Make all commands consistent. Think about success event message  
    if (RetStatus == true)
    {
       Memory->CmdStatus.Function = MEM_MGR_MemFunction_PEEK;

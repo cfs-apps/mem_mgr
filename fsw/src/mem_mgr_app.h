@@ -32,7 +32,7 @@
 #include "app_cfg.h"
 #include "memory.h"
 #include "mem_file.h"
-
+#include "mem_dwell.h"
 
 /***********************/
 /** Macro Definitions **/
@@ -77,11 +77,11 @@ typedef struct
     
    INITBL_Class_t  IniTbl; 
    CMDMGR_Class_t  CmdMgr;
-   
+   TBLMGR_Class_t  TblMgr;
+      
    /*
    ** Command Packets
    */
-
  
    /*
    ** Telemetry Packets
@@ -98,8 +98,9 @@ typedef struct
    CFE_SB_MsgId_t   CmdMid;
    CFE_SB_MsgId_t   SendStatusMid;
    
-   MEMORY_Class_t   Memory;
-   MEM_FILE_Class_t MemFile;
+   MEMORY_Class_t    Memory;
+   MEM_FILE_Class_t  MemFile;
+   MEM_DWELL_Class_t MemDwell;
    
 } MEM_MGR_Class_t;
 

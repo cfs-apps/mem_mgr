@@ -42,7 +42,7 @@
 /*******************************/
 
 static bool ComputeFileCrc(const char *Filename, osal_id_t FileHandle, APP_C_FW_CrcUint8_Enum_t CrcType, uint32 *Crc);
-static bool CreateDumpFile(const char *Filename, osal_id_t FileHandle, const MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr);
+static bool CreateDumpFile(const char *Filename, osal_id_t FileHandle, MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr);
 static bool DumpMemToFile(MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, osal_id_t FileHandle, const char *Filename, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
 static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DestAddr, osal_id_t FileHandle, const char *Filename, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
 static bool ProcessLoadFile(const char *Filename, osal_id_t FileHandle, MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t *CpuAddr);
@@ -60,8 +60,7 @@ static MEM_FILE_Class_t *MemFile = NULL;
 ** Function: MEM_FILE_Constructor
 **
 ** Notes:
-**   1. The memory instance pointer allows MEM_FILE to access MEMORY's command
-**      status variables. Breaks some encapsulation rules but     
+**   None     
 **
 */
 void MEM_FILE_Constructor(MEM_FILE_Class_t *MemFilePtr, const INITBL_Class_t *IniTbl)
@@ -81,7 +80,7 @@ void MEM_FILE_Constructor(MEM_FILE_Class_t *MemFilePtr, const INITBL_Class_t *In
    if (MemFile->LoadBlockSize > MEM_FILE_IO_BLOCK_SIZE)
    {
       CFE_EVS_SendEvent(MEM_FILE_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR,
-                        "JSON init file error: MEM_FILE_LOAD_BLOCK_SIZE %d has been limited to app_cfg.h's MEM_FILE_IO_BLOCK_SIZE %d. See app_cfg.h for details.",
+                        "JSON init file warning: MEM_FILE_LOAD_BLOCK_SIZE %d has been limited to app_cfg.h's MEM_FILE_IO_BLOCK_SIZE %d. See app_cfg.h for details.",
                         MemFile->LoadBlockSize, MEM_FILE_IO_BLOCK_SIZE);      
       MemFile->LoadBlockSize = MEM_FILE_IO_BLOCK_SIZE;
    }
@@ -90,7 +89,7 @@ void MEM_FILE_Constructor(MEM_FILE_Class_t *MemFilePtr, const INITBL_Class_t *In
    if (MemFile->DumpBlockSize > MEM_FILE_IO_BLOCK_SIZE)
    {
       CFE_EVS_SendEvent(MEM_FILE_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR,
-                        "JSON init file error: MEM_FILE_DUMP_BLOCK_SIZE %d has been limited to app_cfg.h's MEM_FILE_IO_BLOCK_SIZE %d. See app_cfg.h for details.",
+                        "JSON init file warning: MEM_FILE_DUMP_BLOCK_SIZE %d has been limited to app_cfg.h's MEM_FILE_IO_BLOCK_SIZE %d. See app_cfg.h for details.",
                         MemFile->DumpBlockSize, MEM_FILE_IO_BLOCK_SIZE);      
       MemFile->DumpBlockSize = MEM_FILE_IO_BLOCK_SIZE;
    }
@@ -99,7 +98,7 @@ void MEM_FILE_Constructor(MEM_FILE_Class_t *MemFilePtr, const INITBL_Class_t *In
    if (MemFile->FillBlockSize > MEM_FILE_IO_BLOCK_SIZE)
    {
       CFE_EVS_SendEvent(MEM_FILE_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR,
-                        "JSON init file error: MEM_FILE_FILL_BLOCK_SIZE %d has been limited to app_cfg.h's MEM_FILE_IO_BLOCK_SIZE %d. See app_cfg.h for details.",
+                        "JSON init file warning: MEM_FILE_FILL_BLOCK_SIZE %d has been limited to app_cfg.h's MEM_FILE_IO_BLOCK_SIZE %d. See app_cfg.h for details.",
                         MemFile->FillBlockSize, MEM_FILE_IO_BLOCK_SIZE);      
       MemFile->FillBlockSize = MEM_FILE_IO_BLOCK_SIZE;
    }
@@ -133,7 +132,7 @@ bool MEM_FILE_DumpCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       if (MEMORY_VerifyAddr(DumpCmd->SymbolAddr, DumpCmd->MemType, DumpCmd->MemSize,
                             DumpCmd->ByteCnt, &VerifiedMemory))
       {
-         OsStatus = OS_OpenCreate(&FileHandle, DumpCmd->Filename, OS_FILE_FLAG_NONE, OS_READ_WRITE);
+         OsStatus = OS_OpenCreate(&FileHandle, DumpCmd->Filename, OS_FILE_FLAG_CREATE, OS_READ_WRITE);
          if (OsStatus == OS_SUCCESS)
          {         
             memset(&SecFileHdr, 0, sizeof(MEM_MGR_SecFileHdr_t));
@@ -145,10 +144,9 @@ bool MEM_FILE_DumpCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
             SecFileHdr.MemType = DumpCmd->MemType;
             SecFileHdr.MemSize = DumpCmd->MemSize;
             SecFileHdr.ByteCnt = DumpCmd->ByteCnt;
-            SecFileHdr.CrcType = APP_C_FW_CrcUint8_CRC_16;
-
+            SecFileHdr.CrcType = MEM_MGR_CRC;
             CreateDumpFile(DumpCmd->Filename, FileHandle, &SecFileHdr, VerifiedMemory.CpuAddr);
-            
+                        
             OsStatus = OS_close(FileHandle);
             if (OsStatus == OS_SUCCESS)
             {
@@ -181,6 +179,11 @@ bool MEM_FILE_DumpCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       
       MEMORY_SetCmdStatus(&MemFile->CmdStatus);
       strncpy(MemFile->Filename, DumpCmd->Filename, OS_MAX_PATH_LEN);
+
+      CFE_EVS_SendEvent(MEM_FILE_DUMP_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                        "Successfully dumped %d bytes to %s",
+                        DumpCmd->ByteCnt, DumpCmd->Filename);
+
    }
     
    return RetStatus;
@@ -214,7 +217,7 @@ bool MEM_FILE_DumpSymTblCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       if (OsStatus == OS_SUCCESS)
       {
          strncpy(MemFile->Filename, DumpCmd->Filename, OS_MAX_PATH_LEN);
-         //TODO: Is symbol table background? Shoudl this command be reported in memory filename?
+         //TODO: Is symbol table background? Should this command be reported in memory filename?
          CFE_EVS_SendEvent(MEM_FILE_DUMP_SYM_TBL_CMD_EID, CFE_EVS_EventType_INFORMATION,
                            "Started Dump Symbol Table to File %s", Filename);
          RetStatus = true;
@@ -299,6 +302,10 @@ bool MEM_FILE_LoadCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       
       MEMORY_SetCmdStatus(&MemFile->CmdStatus);
       strncpy(MemFile->Filename, LoadCmd->Filename, OS_MAX_PATH_LEN);
+      
+      CFE_EVS_SendEvent(MEM_FILE_LOAD_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                        "Successfully loaded %d bytes from %s",
+                        SecFileHdr.ByteCnt, LoadCmd->Filename);
    }
     
    return RetStatus;
@@ -321,7 +328,8 @@ void MEM_FILE_ResetStatus(void)
 ** Function: ComputeFileCrc
 **
 ** Notes:
-**   1. Assumes the file is positioned at the start of the load data. 
+**   1. Assumes the file is positioned at the start of the data after the
+**      headers. 
 **   2. TaskBlockCount is the count of "task blocks" performed. A task block is 
 **      is group of instructions that is CPU intensive and may need to be 
 **      periodically suspended to prevent CPU hogging.
@@ -395,11 +403,13 @@ static bool ComputeFileCrc(const char *Filename, osal_id_t FileHandle, APP_C_FW_
 **
 */
 static bool CreateDumpFile(const char *Filename, osal_id_t FileHandle,
-                           const MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr)
+                           MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr)
 {
 
-   bool  RetStatus = false;
-   int32 OsStatus; 
+   bool   RetStatus = false;
+   int32  OsStatus;
+   uint32 FileCrc;
+   uint16 HeaderLen = (sizeof(CFE_FS_Header_t) + sizeof(MEM_MGR_SecFileHdr_t)); 
    CFE_FS_Header_t  CfeFileHeader;
 
    CFE_FS_InitHeader(&CfeFileHeader, INITBL_GetStrConfig(MemFile->IniTbl, CFG_MEM_FILE_CFE_HDR_DESCR),
@@ -429,9 +439,35 @@ static bool CreateDumpFile(const char *Filename, osal_id_t FileHandle,
                         Filename, (unsigned int)OsStatus, (unsigned int)FILE_PRI_HDR_BYTES);
 
    } /* End invalid cFE header read */
+
+   if (RetStatus == true)
+   {
+      RetStatus = false;
+      OsStatus = OS_lseek(FileHandle, HeaderLen, OS_SEEK_SET);
+
+      if (OsStatus == HeaderLen)
+      {
+         if (ComputeFileCrc(Filename, FileHandle, SecFileHdr->CrcType, &FileCrc))
+         {
+            SecFileHdr->Crc = FileCrc;
+            OsStatus = OS_lseek(FileHandle, FILE_PRI_HDR_BYTES, OS_SEEK_SET);
+            if (OsStatus == FILE_PRI_HDR_BYTES)
+            {
+               OsStatus = OS_write(FileHandle, SecFileHdr, FILE_SEC_HDR_BYTES);
+               RetStatus = (OsStatus == FILE_SEC_HDR_BYTES);
+            }
+         }
+      }
+      if (!RetStatus)
+      {
+         CFE_EVS_SendEvent(MEM_FILE_CREATE_DUMP_FILE_EID, CFE_EVS_EventType_ERROR,
+                           "Error during dump file CRC creation process");
+      }
+      
+   } /* End if data written */
    
-   return RetStatus;
-   
+   return RetStatus;  
+
 }/* End CreateDumpFile() */
 
 
@@ -697,7 +733,7 @@ static bool ValidLoadFile(const char *Filename, osal_id_t FileHandle, const MEM_
             {
                CFE_EVS_SendEvent(MEM_FILE_VALID_LOAD_FILE_EID, CFE_EVS_EventType_ERROR,
                                  "Load file CRC error: Computed=%d Expected=%u File: %s",
-                                 (int)SizeFromOs,(unsigned int)SizeFromHdr, Filename);
+                                 FileCrc, SecFileHdr->Crc, Filename);
 
             }
          }

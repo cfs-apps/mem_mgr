@@ -13,7 +13,7 @@
 **  GNU Affero General Public License for more details.
 **
 **  Purpose:
-**    Define methods for managing files
+**    Define data and methods for managing memory files
 **
 **  Notes:
 **    1. Command and telemetry packets are defined in EDS file filemgr.xml.

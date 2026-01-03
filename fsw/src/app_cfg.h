@@ -32,8 +32,8 @@
 
 #include "app_c_fw.h"
 #include "mem_mgr_platform_cfg.h"
+#include "mem_mgr_eds_defines.h"
 #include "mem_mgr_eds_typedefs.h"
-
 
 /******************************************************************************
 ** Versions
@@ -82,7 +82,13 @@
 #define CFG_MEM_TLM_CHILD_NAME         MEM_TLM_CHILD_NAME
 #define CFG_MEM_TLM_CHILD_STACK_SIZE   MEM_TLM_CHILD_STACK_SIZE
 #define CFG_MEM_TLM_CHILD_PRIORITY     MEM_TLM_CHILD_PRIORITY
-      
+
+#define CFG_DWELL_PIPE_NAME         DWELL_PIPE_NAME
+#define CFG_DWELL_PIPE_DEPTH        DWELL_PIPE_DEPTH
+#define CFG_DWELL_TBL_LOAD_FILE     DWELL_TBL_LOAD_FILE
+#define CFG_DWELL_CHILD_NAME        DWELL_CHILD_NAME
+#define CFG_DWELL_CHILD_STACK_SIZE  DWELL_CHILD_STACK_SIZE
+#define CFG_DWELL_CHILD_PRIORITY    DWELL_CHILD_PRIORITY
 
 
 #define APP_CONFIG(XX) \
@@ -106,8 +112,14 @@
    XX(MEM_FILE_CHILD_PERF_ID,uint32) \
    XX(MEM_TLM_CHILD_NAME,char*) \
    XX(MEM_TLM_CHILD_STACK_SIZE,uint32) \
-   XX(MEM_TLM_CHILD_PRIORITY,uint32)
-
+   XX(MEM_TLM_CHILD_PRIORITY,uint32) \
+   XX(DWELL_PIPE_NAME,char*) \
+   XX(DWELL_PIPE_DEPTH,uint32) \
+   XX(DWELL_CHILD_NAME,char*) \
+   XX(DWELL_CHILD_STACK_SIZE,uint32) \
+   XX(DWELL_CHILD_PRIORITY,uint32) \
+   XX(DWELL_TBL_LOAD_FILE,char*)
+   
 DECLARE_ENUM(Config,APP_CONFIG)
 
 
@@ -119,20 +131,22 @@ DECLARE_ENUM(Config,APP_CONFIG)
 ** exceeded so it is the developer's responsibility to verify the ranges. 
 */
 
-#define MEM_MGR_BASE_EID     (APP_C_FW_APP_BASE_EID +  0)
-#define MEMORY_BASE_EID      (APP_C_FW_APP_BASE_EID + 20)
-#define MEM_SIZE8_BASE_EID   (APP_C_FW_APP_BASE_EID + 30)
-#define MEM_SIZE16_BASE_EID  (APP_C_FW_APP_BASE_EID + 40)
-#define MEM_SIZE32_BASE_EID  (APP_C_FW_APP_BASE_EID + 50)
-#define MEM_FILE_BASE_EID    (APP_C_FW_APP_BASE_EID + 60)
-
+#define MEM_MGR_BASE_EID       (APP_C_FW_APP_BASE_EID +  0)
+#define MEMORY_BASE_EID        (APP_C_FW_APP_BASE_EID + 20)
+#define MEM_SIZE8_BASE_EID     (APP_C_FW_APP_BASE_EID + 30)
+#define MEM_SIZE16_BASE_EID    (APP_C_FW_APP_BASE_EID + 40)
+#define MEM_SIZE32_BASE_EID    (APP_C_FW_APP_BASE_EID + 50)
+#define MEM_FILE_BASE_EID      (APP_C_FW_APP_BASE_EID + 60)
+#define MEM_DWELL_BASE_EID     (APP_C_FW_APP_BASE_EID + 80)
+#define MEM_DWELL_TBL_BASE_EID (APP_C_FW_APP_BASE_EID + 90)
 
 /******************************************************************************
-** Example Object Table Macros
+** Dwell Table Macros
 */
 
-#define EXOBJTBL_JSON_MAX_OBJ          10
-#define EXOBJTBL_JSON_FILE_MAX_CHAR  2000 
+#define MEM_DWELL_TBL_NAME                "Memory Dwell" 
+#define MEM_DWELL_TBL_JSON_FILE_MAX_CHAR  4000 
+
 
 /*
 **

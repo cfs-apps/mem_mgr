@@ -40,7 +40,7 @@
 /* Convenience macros */
 #define  INITBL_OBJ    (&(MemMgr.IniTbl))
 #define  CMDMGR_OBJ    (&(MemMgr.CmdMgr))
-
+#define  TBLMGR_OBJ    (&(MemMgr.TblMgr))
 
 /*******************************/
 /** Local Function Prototypes **/
@@ -125,16 +125,18 @@ bool MEM_MGR_NoOpCmd(void* ObjDataPtr, const CFE_MSG_Message_t *MsgPtr)
 ** Function: MEM_MGR_ResetAppCmd
 **
 ** Notes:
-**   1. Framework objects require an object reference since they are
-**      reentrant. Applications use the singleton pattern and store a
-**      reference pointer to the object data during construction.
+**   None
 */
 bool MEM_MGR_ResetAppCmd(void* ObjDataPtr, const CFE_MSG_Message_t *MsgPtr)
 {
 
    CMDMGR_ResetStatus(CMDMGR_OBJ);
+   TBLMGR_ResetStatus(TBLMGR_OBJ);
+   //TODO: CHILDMGR_ResetStatus(CHILDMGR_OBJ);
+      
    MEMORY_ResetStatus(); 
    MEM_FILE_ResetStatus(); 
+   MEM_DWELL_ResetStatus(); 
    
    return true;
 
@@ -164,12 +166,16 @@ static int32 InitApp(void)
       MemMgr.CmdMid         = CFE_SB_ValueToMsgId(INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_MGR_CMD_TOPICID));
       MemMgr.SendStatusMid  = CFE_SB_ValueToMsgId(INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_MGR_SEND_STATUS_TOPICID));
       
+      /* Must constructor table manager prior to any app objects that contain tables */
+      TBLMGR_Constructor(TBLMGR_OBJ, INITBL_GetStrConfig(INITBL_OBJ, CFG_APP_CFE_NAME));
+      
       /*
       ** Constuct app's contained objects
       */
 
       MEMORY_Constructor(&MemMgr.Memory);
-      MEM_FILE_Constructor(&MemMgr.MemFile, INITBL_OBJ);
+      MEM_FILE_Constructor(&MemMgr.MemFile,  INITBL_OBJ);
+      MEM_DWELL_Constructor(&MemMgr.MemDwell, INITBL_OBJ, TBLMGR_OBJ);
       
       /*
       ** Initialize app level interfaces
@@ -183,6 +189,9 @@ static int32 InitApp(void)
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_NOOP_CC,  NULL, MEM_MGR_NoOpCmd,     0);
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_RESET_CC, NULL, MEM_MGR_ResetAppCmd, 0);
 
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_TBL_CC, TBLMGR_OBJ, TBLMGR_LoadTblCmd, sizeof(MEM_MGR_LoadTbl_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_TBL_CC, TBLMGR_OBJ, TBLMGR_DumpTblCmd, sizeof(MEM_MGR_DumpTbl_CmdPayload_t));
+
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_PEEK_CC,              NULL, MEMORY_PeekCmd,           sizeof(MEM_MGR_Peek_CmdPayload_t));      
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_POKE_CC,              NULL, MEMORY_PokeCmd,           sizeof(MEM_MGR_Poke_CmdPayload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_WITH_INT_DIS_CC, NULL, MEMORY_LoadWithIntDisCmd, sizeof(MEM_MGR_LoadWithIntDis_CmdPayload_t));
@@ -195,6 +204,11 @@ static int32 InitApp(void)
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_FROM_FILE_CC,       NULL, MEM_FILE_LoadCmd,       sizeof(MEM_MGR_LoadFromFile_CmdPayload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_TO_FILE_CC,         NULL, MEM_FILE_DumpCmd,       sizeof(MEM_MGR_DumpToFile_CmdPayload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_SYM_TBL_TO_FILE_CC, NULL, MEM_FILE_DumpSymTblCmd, sizeof(MEM_MGR_DumpSymTblToFile_CmdPayload_t));
+
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_START_DWELL_CC,      NULL, MEM_DWELL_StartCmd,     sizeof(MEM_MGR_DwellId_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_STOP_DWELL_CC,       NULL, MEM_DWELL_StopCmd,      sizeof(MEM_MGR_DwellId_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_DWELL_ENTRY_CC, NULL, MEM_DWELL_LoadEntryCmd, sizeof(MEM_MGR_LoadDwellEntry_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_SET_DWELL_NAME_CC,   NULL, MEM_DWELL_SetNameCmd,   sizeof(MEM_MGR_SetDwellName_CmdPayload_t));
       
       /*
       ** Initialize app messages 

@@ -1,0 +1,150 @@
+/*
+**  Copyright 2022 bitValence, Inc.
+**  All Rights Reserved.
+**
+**  This program is free software; you can modify and/or redistribute it
+**  under the terms of the GNU Affero General Public License
+**  as published by the Free Software Foundation; version 3 with
+**  attribution addendums as found in the LICENSE.txt
+**
+**  This program is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU Affero General Public License for more details.
+**
+**  Purpose:
+**    Define memory dwell class that manages the creation of dwell telemetry
+**    packets that contain from meory locations defined in dwell tables.
+**
+**  Notes:
+**    1. MEM_DWELL_TBL defines what is contained in each dwell telemetry 
+**       packet. The MEM_DWELL class defines data that is needed to manage
+**       each dwell telemetry message.  
+**
+*/
+
+#ifndef _mem_dwell_
+#define _mem_dwell_
+
+/*
+** Includes
+*/
+
+#include "app_cfg.h"
+#include "memory.h"
+#include "mem_dwell_tbl.h"
+
+/***********************/
+/** Macro Definitions **/
+/***********************/
+
+
+/*
+** Event Message IDs
+*/
+
+#define MEM_DWELL_CONSTRUCTOR_EID     (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_INVALID_ID_EID      (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_INVALID_NAME_EID    (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_SET_NAME_CMD_EID    (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_START_CMD_EID       (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_STOP_CMD_EID        (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_LOAD_ENTRY_CMD_EID  (MEM_DWELL_BASE_EID + 0)
+
+/**********************/
+/** Type Definitions **/
+/**********************/
+
+typedef struct
+{
+   uint16 DelayCnt;
+   
+} MEM_DWELL_State_t;
+
+
+/******************************************************************************
+** MEM_DWELL_Class
+*/
+
+
+typedef struct
+{
+
+   /*
+   ** App Framework References
+   */
+   
+   const INITBL_Class_t *IniTbl;
+   
+   /*
+   ** MEM_DWELL State Data
+   */
+
+   MEM_DWELL_State_t  State[MEM_MGR_DWELL_ID_CNT];
+   
+   /*
+   ** Contained Objects
+   */
+
+   MEM_DWELL_TBL_Class_t  Tbl;
+   
+} MEM_DWELL_Class_t;
+
+
+
+/************************/
+/** Exported Functions **/
+/************************/
+
+
+/******************************************************************************
+** Function: MEM_DWELL_Constructor
+**
+** Initialize the MEM_DWELL to a known state
+**
+** Notes:
+**   1. This must be called prior to any other function.
+**
+*/
+void MEM_DWELL_Constructor(MEM_DWELL_Class_t *MemDwellPtr,
+                           const INITBL_Class_t *IniTbl,
+                           TBLMGR_Class_t *TblMgr);
+
+
+/******************************************************************************
+** Function: MEM_DWELL_LoadEntryCmd
+**
+*/
+bool MEM_DWELL_LoadEntryCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
+
+
+/******************************************************************************
+** Function:  MEM_DWELL_ResetStatus
+**
+*/
+void MEM_DWELL_ResetStatus(void);
+
+
+/******************************************************************************
+** Function: MEM_DWELL_SetNameCmd
+**
+*/
+bool MEM_DWELL_SetNameCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
+
+
+/******************************************************************************
+** Function: MEM_DWELL_StartCmd
+**
+*/
+bool MEM_DWELL_StartCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
+
+
+/******************************************************************************
+** Function: MEM_DWELL_StopCmd
+**
+*/
+bool MEM_DWELL_StopCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
+
+
+
+#endif /* _mem_dwell_ */

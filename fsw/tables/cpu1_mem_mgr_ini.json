@@ -1,6 +1,6 @@
 {
-   "title": "Hello World initialization file",
-   "description": ["Define runtime configurations",
+   "title": "Memory Manager Initialization Table",
+   "description": ["Define runtime configuration parameters",
                     "These parameters support file-based memory fill, load and dump operations",
                     "MEM_FILE_xxx_BLOCK_SIZE: Values must be less than MEM_FILE_TASK_FILE_BLOCK_SIZE defined in app_cfg.h",
                     "CFE_FILE_HDR_SUBTYPE: Identify MEM_MGR files. 1078807872 = 0x404D4D40 => @MM@ in ASCII",
@@ -11,9 +11,9 @@
       "APP_CFE_NAME": "MEM_MGR",
       "APP_PERF_ID":  127,
           
-      "APP_CMD_PIPE_DEPTH": 5,
       "APP_CMD_PIPE_NAME":  "MEM_MGR_CMD",
-
+      "APP_CMD_PIPE_DEPTH": 5,
+      
       "MEM_MGR_CMD_TOPICID": 0,
       "BC_SCH_4_SEC_TOPICID": 0,
       "MEM_MGR_STATUS_TLM_TOPICID": 0,
@@ -34,7 +34,14 @@
       
       "MEM_TLM_CHILD_NAME":        "MEM_MGR_TLM",
       "MEM_TLM_CHILD_STACK_SIZE":  20480,
-      "MEM_TLM_CHILD_PRIORITY":    50
+      "MEM_TLM_CHILD_PRIORITY":    50,
+
+      "DWELL_PIPE_DEPTH":       5,
+      "DWELL_PIPE_NAME":        "MEM_MGR_DWELL",
+      "DWELL_TBL_LOAD_FILE":    "/cf/mem_dwell_tbl.json",
+      "DWELL_CHILD_NAME":       "MEM_MGR_DWELL_",
+      "DWELL_CHILD_STACK_SIZE": 32768,
+      "DWELL_CHILD_PRIORITY":   50
 
    }
 }
