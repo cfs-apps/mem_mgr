@@ -38,9 +38,12 @@
 /***********************/
 
 /* Convenience macros */
-#define  INITBL_OBJ    (&(MemMgr.IniTbl))
-#define  CMDMGR_OBJ    (&(MemMgr.CmdMgr))
-#define  TBLMGR_OBJ    (&(MemMgr.TblMgr))
+#define  INITBL_OBJ     (&(MemMgr.IniTbl))
+#define  CMDMGR_OBJ     (&(MemMgr.CmdMgr))
+#define  TBLMGR_OBJ     (&(MemMgr.TblMgr))
+#define  FILECHILD_OBJ  (&(MemMgr.FileChildMgr))
+#define  DWELLCHILD_OBJ (&(MemMgr.DwellChildMgr))
+#define  MEMFILE_OBJ    (&(MemMgr.MemFile))
 
 #define MEM_DWELL_CTRL_PTR(id) (&(MemMgr.MemDwell.Ctrl[id-1]))
 
@@ -147,7 +150,8 @@ bool MEM_MGR_ResetAppCmd(void* ObjDataPtr, const CFE_MSG_Message_t *MsgPtr)
    
    CMDMGR_ResetStatus(CMDMGR_OBJ);
    TBLMGR_ResetStatus(TBLMGR_OBJ);
-   //TODO: CHILDMGR_ResetStatus(CHILDMGR_OBJ);
+   CHILDMGR_ResetStatus(FILECHILD_OBJ);
+   CHILDMGR_ResetStatus(DWELLCHILD_OBJ);
       
    MEMORY_ResetStatus(); 
    MEM_FILE_ResetStatus(); 
@@ -166,7 +170,7 @@ static int32 InitApp(void)
 {
 
    int32 Status = APP_C_FW_CFS_ERROR;
-   
+   CHILDMGR_TaskInit_t ChildTaskInit;
 
    /*
    ** Initialize objects 
@@ -183,7 +187,7 @@ static int32 InitApp(void)
       
       /* Must constructor table manager prior to any app objects that contain tables */
       TBLMGR_Constructor(TBLMGR_OBJ, INITBL_GetStrConfig(INITBL_OBJ, CFG_APP_CFE_NAME));
-      
+     
       /*
       ** Constuct app's contained objects
       */
@@ -191,7 +195,25 @@ static int32 InitApp(void)
       MEMORY_Constructor(&MemMgr.Memory);
       MEM_FILE_Constructor(&MemMgr.MemFile,  INITBL_OBJ);
       MEM_DWELL_Constructor(&MemMgr.MemDwell, INITBL_OBJ, TBLMGR_OBJ);
-      
+
+      /*
+      ** Constuct child manager objects
+      ** - CHILDMGR_Constructor()sends error events
+      */
+
+      ChildTaskInit.TaskName  = INITBL_GetStrConfig(INITBL_OBJ, CFG_MEM_FILE_CHILD_NAME);
+      ChildTaskInit.StackSize = INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_FILE_CHILD_STACK_SIZE);
+      ChildTaskInit.Priority  = INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_FILE_CHILD_PRIORITY);
+      ChildTaskInit.PerfId    = INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_FILE_CHILD_PERF_ID);
+      Status = CHILDMGR_Constructor(FILECHILD_OBJ, ChildMgr_TaskMainCmdDispatch,
+                                    NULL, &ChildTaskInit); 
+
+      ChildTaskInit.TaskName  = INITBL_GetStrConfig(INITBL_OBJ, CFG_MEM_DWELL_CHILD_NAME);
+      ChildTaskInit.StackSize = INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_DWELL_CHILD_STACK_SIZE);
+      ChildTaskInit.Priority  = INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_DWELL_CHILD_PRIORITY);
+      ChildTaskInit.PerfId    = INITBL_GetIntConfig(INITBL_OBJ, CFG_MEM_DWELL_CHILD_PERF_ID);
+      Status = CHILDMGR_Constructor(DWELLCHILD_OBJ, ChildMgr_TaskMainCallback,
+                                    MEM_DWELL_ChildTask, &ChildTaskInit);        
       /*
       ** Initialize app level interfaces
       */
@@ -216,10 +238,13 @@ static int32 InitApp(void)
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_ENA_EEPROM_WRITE_CC,  NULL, MEMORY_EnaEepromWriteCmd, sizeof(MEM_MGR_EnaEepromWrite_CmdPayload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DIS_EEPROM_WRITE_CC,  NULL, MEMORY_DisEepromWriteCmd, sizeof(MEM_MGR_DisEepromWrite_CmdPayload_t));
 
-      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_FROM_FILE_CC,       NULL, MEM_FILE_LoadCmd,       sizeof(MEM_MGR_LoadFromFile_CmdPayload_t));
-      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_TO_FILE_CC,         NULL, MEM_FILE_DumpCmd,       sizeof(MEM_MGR_DumpToFile_CmdPayload_t));
-      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_SYM_TBL_TO_FILE_CC, NULL, MEM_FILE_DumpSymTblCmd, sizeof(MEM_MGR_DumpSymTblToFile_CmdPayload_t));
-
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_FROM_FILE_CC,          FILECHILD_OBJ, CHILDMGR_InvokeChildCmd, sizeof(MEM_MGR_LoadFromFile_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_TO_FILE_CC,            FILECHILD_OBJ, CHILDMGR_InvokeChildCmd, sizeof(MEM_MGR_DumpToFile_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_DUMP_SYM_TBL_TO_FILE_CC,    FILECHILD_OBJ, CHILDMGR_InvokeChildCmd, sizeof(MEM_MGR_DumpSymTblToFile_CmdPayload_t));
+      CHILDMGR_RegisterFunc(FILECHILD_OBJ, MEM_MGR_LOAD_FROM_FILE_CC,       MEMFILE_OBJ, MEM_FILE_LoadCmd);
+      CHILDMGR_RegisterFunc(FILECHILD_OBJ, MEM_MGR_DUMP_TO_FILE_CC,         MEMFILE_OBJ, MEM_FILE_DumpCmd);
+      CHILDMGR_RegisterFunc(FILECHILD_OBJ, MEM_MGR_DUMP_SYM_TBL_TO_FILE_CC, MEMFILE_OBJ, MEM_FILE_DumpSymTblCmd);
+      
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_START_DWELL_CC,      NULL, MEM_DWELL_StartCmd,     sizeof(MEM_MGR_DwellId_CmdPayload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_STOP_DWELL_CC,       NULL, MEM_DWELL_StopCmd,      sizeof(MEM_MGR_DwellId_CmdPayload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, MEM_MGR_LOAD_DWELL_ENTRY_CC, NULL, MEM_DWELL_LoadEntryCmd, sizeof(MEM_MGR_LoadDwellEntry_CmdPayload_t));
@@ -280,13 +305,12 @@ static int32 ProcessCommands(void)
          } 
          else if (CFE_SB_MsgId_Equal(MsgId, MemMgr.SendStatusMid))
          {   
-            MEM_DWELL_Execute();  //TODO: Move to own execution message and use a child task
             SendStatusTlm();
          }
          else
          {   
             CFE_EVS_SendEvent(MEM_MGR_INVALID_MID_EID, CFE_EVS_EventType_ERROR,
-                              "Received invalid command packet, MID = 0x%08X", 
+                              "Received unexpected packet on command pipe, MID = 0x%08X", 
                               CFE_SB_MsgIdToValue(MsgId));
          }
 

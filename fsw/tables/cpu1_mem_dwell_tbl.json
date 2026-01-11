@@ -38,8 +38,8 @@
       {
          "id": 1,
          "name": "mem_maint_ex",
-         "topic-id-1": 2155,
-         "topic-id": 2155,
+         "topic-id-1": 0,
+         "topic-id": 0,
          "enabled": "false",
          "entry": [
             { "mem-size": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  0}},
@@ -51,8 +51,8 @@
       {
          "id": 2,
          "name": "null",
-         "topic-id-2": 2156,
-         "topic-id": 2156,
+         "topic-id-2": 0,
+         "topic-id": 0,
          "enabled": "false",
          "entry": [
             { "mem-size": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},

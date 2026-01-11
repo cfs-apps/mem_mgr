@@ -17,7 +17,8 @@
       "MEM_MGR_CMD_TOPICID": 0,
       "BC_SCH_4_SEC_TOPICID": 0,
       "MEM_MGR_STATUS_TLM_TOPICID": 0,
-
+      "BC_SCH_1_HZ_TOPICID": 0,
+      
       "MEM_FILE_LOAD_BLOCK_SIZE": 200,
       "MEM_FILE_DUMP_BLOCK_SIZE": 200,
       "MEM_FILE_FILL_BLOCK_SIZE": 200,
@@ -31,17 +32,13 @@
       "MEM_FILE_CHILD_STACK_SIZE":  20480,
       "MEM_FILE_CHILD_PRIORITY":    205,
       "MEM_FILE_CHILD_PERF_ID":     999,
-      
-      "MEM_TLM_CHILD_NAME":        "MEM_MGR_TLM",
-      "MEM_TLM_CHILD_STACK_SIZE":  20480,
-      "MEM_TLM_CHILD_PRIORITY":    50,
 
-      "DWELL_PIPE_DEPTH":       5,
-      "DWELL_PIPE_NAME":        "MEM_MGR_DWELL",
-      "DWELL_TBL_LOAD_FILE":    "/cf/mem_dwell_tbl.json",
-      "DWELL_CHILD_NAME":       "MEM_MGR_DWELL_",
-      "DWELL_CHILD_STACK_SIZE": 32768,
-      "DWELL_CHILD_PRIORITY":   50
-
+      "MEM_DWELL_PIPE_DEPTH":       5,
+      "MEM_DWELL_PIPE_NAME":        "MEM_MGR_DWELL_EXEC",
+      "MEM_DWELL_TBL_LOAD_FILE":    "/cf/mem_dwell_tbl.json",
+      "MEM_DWELL_CHILD_NAME":       "MEM_MGR_DWELL",
+      "MEM_DWELL_CHILD_STACK_SIZE": 32768,
+      "MEM_DWELL_CHILD_PRIORITY":   50,
+      "MEM_DWELL_CHILD_PERF_ID":    999
    }
 }

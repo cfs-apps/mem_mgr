@@ -44,13 +44,13 @@
 */
 
 #define MEM_DWELL_CONSTRUCTOR_EID     (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_INVALID_ID_EID      (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_INVALID_NAME_EID    (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_SET_NAME_CMD_EID    (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_START_CMD_EID       (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_STOP_CMD_EID        (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_LOAD_ENTRY_CMD_EID  (MEM_DWELL_BASE_EID + 0)
-#define MEM_DWELL_EXECUTE_ERR_EID     (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_INVALID_ID_EID      (MEM_DWELL_BASE_EID + 1)
+#define MEM_DWELL_INVALID_NAME_EID    (MEM_DWELL_BASE_EID + 2)
+#define MEM_DWELL_SET_NAME_CMD_EID    (MEM_DWELL_BASE_EID + 3)
+#define MEM_DWELL_START_CMD_EID       (MEM_DWELL_BASE_EID + 4)
+#define MEM_DWELL_STOP_CMD_EID        (MEM_DWELL_BASE_EID + 5)
+#define MEM_DWELL_LOAD_ENTRY_CMD_EID  (MEM_DWELL_BASE_EID + 6)
+#define MEM_DWELL_EXECUTE_ERR_EID     (MEM_DWELL_BASE_EID + 7)
 
 
 /**********************/
@@ -95,6 +95,11 @@ typedef struct
    ** MEM_DWELL MEM State Data
    */
 
+   
+   uint32           PerfId;
+   CFE_SB_PipeId_t  ExecPipe;
+   CFE_SB_MsgId_t   ExecMid;
+   
    MEM_MGR_DwellTlm_t  Tlm[MEM_MGR_DWELL_ID_CNT];
    MEM_DWELL_Ctrl_t    Ctrl[MEM_MGR_DWELL_ID_CNT];
    
@@ -128,10 +133,14 @@ void MEM_DWELL_Constructor(MEM_DWELL_Class_t *MemDwellPtr,
 
 
 /******************************************************************************
-** Function: MEM_DWELL_Execute
+** Function: MEM_DWELL_ChildTask
 ** 
+** Notes:
+**   1.  This is a CHILDMGR callback function and the function signature must
+**       match CHILDMGR_TaskCallback_t.
+**
 */
-bool MEM_DWELL_Execute(void);
+bool MEM_DWELL_ChildTask(CHILDMGR_Class_t* ChildMgr);
 
 
 /******************************************************************************

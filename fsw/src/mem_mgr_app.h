@@ -75,10 +75,12 @@ typedef struct
    ** App Framework
    */ 
     
-   INITBL_Class_t  IniTbl; 
-   CMDMGR_Class_t  CmdMgr;
-   TBLMGR_Class_t  TblMgr;
-      
+   INITBL_Class_t   IniTbl; 
+   CMDMGR_Class_t   CmdMgr;
+   TBLMGR_Class_t   TblMgr;
+   CHILDMGR_Class_t FileChildMgr;   
+   CHILDMGR_Class_t DwellChildMgr;   
+         
    /*
    ** Command Packets
    */
