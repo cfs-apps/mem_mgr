@@ -16,7 +16,7 @@
 **    Implement the MEM_MGR_Class methods
 **
 **  Notes:
-**    1. TODO: Describe OO design
+**    1. TODO: Describe OO design. Think about separate DwellTlm object.
 **
 */
 
@@ -27,12 +27,20 @@
 #include <string.h>
 #include "mem_dwell.h"
 
+/*
+** Obtain pointer to arrays using Dwell IDs as indices
+*/
+//TODO: May just need a ID to indice macro
+#define MEM_DWELL_TLM_PTR(id)  (&MemDwell->Tlm[id-1])  // Access array of MEM_MGR_DwellTlm_t using dwell IDs
+#define MEM_DWELL_CTRL_PTR(id) (&MemDwell->Ctrl[id-1])
+
 
 /*******************************/
 /** Local Function Prototypes **/
 /*******************************/
 
-static bool ComputeByteCnt(MEM_MGR_MemSize_Enum_t MemSize,uint16 *ByteCnt);
+static bool AcceptDwellTableLoad(const MEM_DWELL_TBL_Dwell_t DwellTbl[MEM_MGR_DWELL_ID_CNT]);
+static void SendDwellTlm(MEM_MGR_DwellTlm_t *DwellTlm, uint16 DataByteLen);
 static bool ValidDwellId(uint16 Id, const char *CmdStr);
 static bool ValidDwellName(const char *Name, const char *CmdStr);
 
@@ -56,21 +64,48 @@ void MEM_DWELL_Constructor(MEM_DWELL_Class_t *MemDwellPtr,
                            const INITBL_Class_t *IniTbl,
                            TBLMGR_Class_t *TblMgr)
 {
+
+   MEM_MGR_DwellId_Enum_t     DwellId;
+   MEM_DWELL_TBL_Dwell_t      *DwellTbl;
+   MEM_MGR_DwellTlm_t         *DwellTlm;
+   MEM_MGR_DwellTlm_Payload_t *TlmPayload;
+   MEM_DWELL_Ctrl_t           *DwellCtrl;
+
    
    MemDwell = MemDwellPtr;
-
    CFE_PSP_MemSet((void*)MemDwell, 0, sizeof(MEM_DWELL_Class_t));
-
    MemDwell->IniTbl = IniTbl;
 
-   MEM_DWELL_TBL_Constructor(&MemDwell->Tbl);
-
-
+   MEM_DWELL_TBL_Constructor(&MemDwell->Tbl,AcceptDwellTableLoad);
+   
    TBLMGR_RegisterTblWithDef(TblMgr, MEM_DWELL_TBL_NAME,
                              MEM_DWELL_TBL_LoadCmd, MEM_DWELL_TBL_DumpCmd,  
                              INITBL_GetStrConfig(IniTbl, CFG_DWELL_TBL_LOAD_FILE));
 
-                             
+   /*
+   ** Initialize dwell telemetry messages 
+   ** - AcceptDwellTableLoad() computes and loads the control data structure
+   */
+   for (DwellId = MEM_MGR_DwellId_Enum_t_MIN; DwellId <= MEM_MGR_DwellId_Enum_t_MAX; DwellId++)
+   {
+      DwellTbl = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,DwellId);
+      DwellTlm = MEM_DWELL_TLM_PTR(DwellId);
+      
+      CFE_MSG_Init(CFE_MSG_PTR(DwellTlm->TelemetryHeader), CFE_SB_ValueToMsgId(DwellTbl->TopicId),
+                   sizeof(MEM_MGR_DwellTlm_t));
+                   
+      TlmPayload = &DwellTlm->Payload;
+      DwellCtrl  = MEM_DWELL_CTRL_PTR(DwellId);
+      
+      TlmPayload->Id = DwellTbl->Id;
+      strncpy(TlmPayload->Name,DwellTbl->Name,MEM_MGR_DWELL_NAME_LEN);
+      
+      TlmPayload->Delay        = DwellCtrl->Tbl.DelayCnts;
+      TlmPayload->AddressCnt   = DwellCtrl->Tbl.AddrCnt;
+      TlmPayload->DataByteLen  = DwellCtrl->Tbl.DataLen;      
+      
+   } /* End dwell ID loop */
+   
 } /* End MEM_DWELL_Constructor() */
 
 
@@ -78,21 +113,93 @@ void MEM_DWELL_Constructor(MEM_DWELL_Class_t *MemDwellPtr,
 ** Function: MEM_DWELL_Execute
 **
 ** Notes:
-**   1. DelayCnt does not need to be validated because it any uint16 value
-**      is valid.
+**   1. The following data sources are used to control the generation of dwell
+**      telemetry messages:
+**        MemDwell->DwellTbl     Parameters defined in JSON dwell table 
+**        MemDwell->Ctrl[].Tbl   Parameters derived from JSON defined parameters
+**                               These are computed when the table is loaded or
+**                               jammed (updated via command)
+**        MemDwell->Ctrl[].State Dynamic variables that 
 ** 
 */
-bool MEM_DWELL_Execute(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
+bool MEM_DWELL_Execute(void)
 {
    
-   uint16 DwellId;
-   MEM_DWELL_TBL_Dwell_t *DwellTbl;
-   
-   for (DwellId = MEM_MGR_DwellId_Enum_t_MIN; DwellId < MEM_MGR_DwellId_Enum_t_MAX; DwellId++)
+   MEM_MGR_DwellId_Enum_t  DwellId;
+   MEM_DWELL_TBL_Dwell_t   *DwellTbl;
+   MEM_DWELL_Ctrl_t        *DwellCtrl;
+   MEM_MGR_DwellTlm_t      *DwellTlm;
+   uint16  EntryIndex;
+   uint16  DwellBytes;
+   uint32  DwellData;
+
+   for (DwellId = MEM_MGR_DwellId_Enum_t_MIN; DwellId <= MEM_MGR_DwellId_Enum_t_MAX; DwellId++)
    {
-      DwellTbl = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,DwellId);
-      OS_printf("Dwell ID = %d\n",DwellTbl->Id);
-      
+      DwellTbl  = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,DwellId);
+      DwellCtrl = MEM_DWELL_CTRL_PTR(DwellId);
+      DwellTlm  = MEM_DWELL_TLM_PTR(DwellId);
+OS_printf("Table %d: Enabled %d, DelayCntDown %d, EntryIndex %d, TlmDataOffset %d\n",
+          DwellId,DwellTbl->Enabled,DwellCtrl->DelayCntDown,DwellCtrl->EntryIndex,DwellCtrl->TlmDataOffset);
+      if (DwellTbl->Enabled && DwellCtrl->Tbl.DelayCnts > 0)
+      {
+         DwellCtrl->DelayCntDown--;
+
+         while (DwellCtrl->DelayCntDown == 0)
+         {
+           
+            EntryIndex = DwellCtrl->EntryIndex;
+OS_printf("EntryIndex %d: Address=%p, MemSize=%d\n",
+          EntryIndex,(void *)DwellTbl->Entry[EntryIndex].VerifiedMemory.CpuAddr,DwellTbl->Entry[EntryIndex].MemSize);
+            // A zero address with a valid MemSize should not pass table validation 
+            if (DwellTbl->Entry[EntryIndex].VerifiedMemory.CpuAddr != 0)
+            {
+               DwellBytes = MEMORY_Read(DwellTbl->Entry[EntryIndex].VerifiedMemory,
+                                        DwellTbl->Entry[EntryIndex].MemSize, &DwellData);
+            }
+            else
+            {
+               DwellTbl->Enabled = false;
+               CFE_EVS_SendEvent(MEM_DWELL_EXECUTE_ERR_EID, CFE_EVS_EventType_ERROR,
+                                 "Dwell table %d disabled with critical error. Entry index %d is within address count %d and contains an invalid address", 
+                                 DwellId, EntryIndex, DwellCtrl->Tbl.AddrCnt);               
+            }
+OS_printf("DwellBytes %d, DwellData %d, TLM ID %d\n",DwellBytes,DwellData,DwellTlm->Payload.Id);         
+       
+            if (DwellBytes > 0)
+            {
+               memcpy(&DwellTlm->Payload.Data[DwellCtrl->TlmDataOffset], &DwellData, DwellBytes);
+               DwellCtrl->TlmDataOffset += DwellBytes;
+            }
+            else
+            {
+               // Maintain offset so ground can interpret the data
+               // Send error event message and stay in loop to manage counters
+
+               DwellCtrl->TlmDataOffset +=  DwellTbl->Entry[EntryIndex].MemSize;
+               CFE_EVS_SendEvent(MEM_DWELL_EXECUTE_ERR_EID, CFE_EVS_EventType_ERROR,
+                                 "Error reading memory for dwell table %d at entry index %d", 
+                                 DwellId, EntryIndex);
+            }
+                      
+            if (EntryIndex == DwellCtrl->Tbl.AddrCnt-1)
+            {
+
+               // Completed telemetry message, send it and reset counters
+               SendDwellTlm(DwellTlm, DwellCtrl->Tbl.DataLen);
+               DwellCtrl->EntryIndex    = 0;
+               DwellCtrl->TlmDataOffset = 0;
+            
+            }
+            else
+            {
+               DwellCtrl->EntryIndex++;
+               
+            } /* End if still filling telemetry message */
+            
+            DwellCtrl->DelayCntDown = DwellTbl->Entry[EntryIndex].Delay;
+            
+         } /* End while Countdown == 0 */
+      } /* End if dwell enabled */
    } /* End dwell ID loop */
    
    return true;
@@ -114,8 +221,6 @@ bool MEM_DWELL_LoadEntryCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
    const MEM_MGR_LoadDwellEntry_CmdPayload_t *Cmd = CMDMGR_PAYLOAD_PTR(MsgPtr, MEM_MGR_LoadDwellEntry_t);
    
    bool    RetStatus = false;
-   uint16  ByteCnt;
-   MEMORY_VerifiedMemory_t VerifiedMemory;
    MEM_DWELL_TBL_Dwell_t *DwellTbl;
 
    // Utility functions send error events
@@ -124,26 +229,19 @@ bool MEM_DWELL_LoadEntryCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       DwellTbl = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,Cmd->DwellId);
       if (Cmd->EntryIndex < MEM_MGR_DWELL_ENTRIES)
       {
-         if (ComputeByteCnt(Cmd->MemSize,&ByteCnt))
+         MEM_DWELL_TBL_Dwell_Entry_t *Entry = &DwellTbl->Entry[Cmd->EntryIndex];
+         RetStatus = MEM_DWELL_TBL_LoadEntry(Entry, Cmd->Delay, Cmd->MemSize, Cmd->SymbolAddr);
+         
+         if (RetStatus)
          {
-            if (MEMORY_VerifyAddr(Cmd->SymbolAddr, MEM_MGR_MemType_RAM, Cmd->MemSize,
-                                  ByteCnt, &VerifiedMemory))
-            {
-               MEM_DWELL_TBL_Dwell_Entry_t *Entry = &DwellTbl->Entry[Cmd->EntryIndex];
-               Entry->Length     = ByteCnt;
-               Entry->Delay      = Cmd->Delay;
-               Entry->SymbolAddr = Cmd->SymbolAddr;
-               
-               RetStatus = true;
-               CFE_EVS_SendEvent(MEM_DWELL_SET_NAME_CMD_EID, CFE_EVS_EventType_INFORMATION,
-                                 "Loaded dwell table %d entry at index %d",
-                                 Cmd->DwellId, Cmd->EntryIndex);
-            }
+            CFE_EVS_SendEvent(MEM_DWELL_LOAD_ENTRY_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                              "Loaded dwell table %d entry at index %d",
+                              Cmd->DwellId, Cmd->EntryIndex);
          }
       }/* End valid entry index */
       else
       {
-         CFE_EVS_SendEvent(MEM_DWELL_LOAD_ENTRY_CMD_EID, CFE_EVS_EventType_INFORMATION,
+         CFE_EVS_SendEvent(MEM_DWELL_LOAD_ENTRY_CMD_EID, CFE_EVS_EventType_ERROR,
                            "Load dwell entry command rejected, entry index %d exceeds maximum index of %d",
                            Cmd->EntryIndex, (MEM_MGR_DWELL_ENTRIES-1));         
       }
@@ -160,7 +258,8 @@ bool MEM_DWELL_LoadEntryCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 */
 void MEM_DWELL_ResetStatus(void)
 {
-   
+
+   // Nothing to reset
    
 } /* End MEM_DWELL_ResetStatus() */
 
@@ -180,13 +279,19 @@ bool MEM_DWELL_SetNameCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
    {
       if (ValidDwellName(Cmd->Name,"Set dwell name"))
       {
-         MEM_DWELL_TBL_Dwell_t *DwellTbl = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,Cmd->DwellId);
+         
+         MEM_DWELL_TBL_Dwell_t      *DwellTbl   = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,Cmd->DwellId);
+         MEM_MGR_DwellTlm_Payload_t *TlmPayload = &(MEM_DWELL_TLM_PTR(Cmd->DwellId)->Payload);
+         
          strncpy(DwellTbl->Name,Cmd->Name,MEM_MGR_DWELL_NAME_LEN);
+         strncpy(TlmPayload->Name,Cmd->Name,MEM_MGR_DWELL_NAME_LEN);
+         
          RetStatus = true;
          CFE_EVS_SendEvent(MEM_DWELL_SET_NAME_CMD_EID, CFE_EVS_EventType_INFORMATION,
                            "Set dwell table %d name to %s", Cmd->DwellId, Cmd->Name);
-      }
-   }
+
+      } /* End if valid name */
+   } /* End if valid ID */
 
    return RetStatus;
    
@@ -202,10 +307,24 @@ bool MEM_DWELL_StartCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 
    const MEM_MGR_DwellId_CmdPayload_t *Cmd = CMDMGR_PAYLOAD_PTR(MsgPtr, MEM_MGR_StartDwell_t);
    bool  RetStatus = true;
+   MEM_DWELL_Ctrl_t       *DwellCtrl;
+   MEM_DWELL_TBL_Dwell_t  *DwellTbl;
+  
+   if (ValidDwellId(Cmd->DwellId,"Set dwell name"))
+   {
+      DwellCtrl = MEM_DWELL_CTRL_PTR(Cmd->DwellId);
+      DwellTbl  = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,Cmd->DwellId);
+
+      DwellTbl->Enabled = true;
+      DwellCtrl->DelayCntDown  = 1;  // Cause dwell packet to be issued on first wakeup 
+      DwellCtrl->TlmDataOffset = 0;
+      DwellCtrl->EntryIndex    = 0;
+
+      CFE_EVS_SendEvent(MEM_DWELL_START_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                        "Enabled dwell table %d", Cmd->DwellId);
    
-   MEM_MGR_DwellId_Enum_t DwellId = Cmd->DwellId;
-   OS_printf("DwellId = %d\n",(uint8)DwellId);
-   
+   } /* End if valid Dwell ID */
+     
    return RetStatus;
    
 } /* End MEM_DWELL_StartCmd() */
@@ -223,43 +342,101 @@ bool MEM_DWELL_StopCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
    const MEM_MGR_DwellId_CmdPayload_t *Cmd = CMDMGR_PAYLOAD_PTR(MsgPtr, MEM_MGR_StopDwell_t);
    bool  RetStatus = true;
    
-   MEM_MGR_DwellId_Enum_t DwellId = Cmd->DwellId;
-   OS_printf("DwellId = %d\n",(uint8)DwellId);
+   MEM_DWELL_Ctrl_t       *DwellCtrl;
+   MEM_DWELL_TBL_Dwell_t  *DwellTbl;
    
+   if (ValidDwellId(Cmd->DwellId,"Set dwell name"))
+   {
+      DwellCtrl = MEM_DWELL_CTRL_PTR(Cmd->DwellId);
+      DwellTbl  = MEM_DWELL_TBL_PTR(MemDwell->Tbl.Dwell,Cmd->DwellId);
+
+      DwellTbl->Enabled = false;
+      DwellCtrl->DelayCntDown  = 0;
+      DwellCtrl->TlmDataOffset = 0;
+      DwellCtrl->EntryIndex    = 0;
+      
+      CFE_EVS_SendEvent(MEM_DWELL_STOP_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                        "Disabled dwell table %d", Cmd->DwellId);
+
+   } /* End if valid Dwell ID */
+
    return RetStatus;
    
 } /* End MEM_DWELL_StopCmd() */
 
 
 /******************************************************************************
-** Function: ComputeByteCnt
+** Function: AcceptDwellTableLoad
 **
+** Notes:
+**   1. If this functiom returns false then the new table will not be used so
+**      it contain table validation logic.
+**   TODO: What validation should be done?
 */
-static bool ComputeByteCnt(MEM_MGR_MemSize_Enum_t MemSize,uint16 *ByteCnt)
+static bool AcceptDwellTableLoad(const MEM_DWELL_TBL_Dwell_t DwellTbl[MEM_MGR_DWELL_ID_CNT])
 {
    
-   bool RetStatus = true;
-
-   *ByteCnt = 0;
-   switch (MemSize)
+   MEM_MGR_DwellId_Enum_t      DwellId;
+   MEM_DWELL_Ctrl_t            *DwellCtrl;
+   const MEM_DWELL_TBL_Dwell_t *DwellTblPtr;
+   uint16  i;
+   uint16  DelayCnts;
+   uint16  AddrCnt;
+   uint16  DataBytes;
+ 
+   for (DwellId = MEM_MGR_DwellId_Enum_t_MIN; DwellId <= MEM_MGR_DwellId_Enum_t_MAX; DwellId++)
    {
-      case MEM_MGR_MemSize_8:
-         *ByteCnt = 1;
-         break;
-      case MEM_MGR_MemSize_16:
-         *ByteCnt = 2;
-         break;
-      case MEM_MGR_MemSize_32:
-         *ByteCnt = 4;
-         break;
-      default:
-         RetStatus = false;
-         break;
-   } /* End mem size switch */
-
-   return RetStatus;
       
-} /* End if ComputeByteCnt() */
+      DwellTblPtr = MEM_DWELL_TBL_PTR(DwellTbl,DwellId);      
+      DwellCtrl   = MEM_DWELL_CTRL_PTR(DwellId);      
+      
+      AddrCnt   = 0;
+      DataBytes = 0;
+      DelayCnts = 0;
+      i = 0;
+      while ((i < MEM_MGR_DWELL_ENTRIES) && MEM_DWELL_TBL_EntryMemSizeEnabled(&DwellTblPtr->Entry[i]))
+      {
+        AddrCnt++;
+        DataBytes += DwellTblPtr->Entry[i].MemSize; //TODO use function?
+        DelayCnts += DwellTblPtr->Entry[i].Delay;
+        i++;
+      }
+      
+      DwellCtrl->Tbl.DelayCnts = DelayCnts;
+      DwellCtrl->Tbl.AddrCnt   = AddrCnt;
+      DwellCtrl->Tbl.DataLen   = DataBytes;
+      
+OS_printf("DwellId %d: DelayCnts %d, AddrCnt %d, DataBytes %d\n",
+          DwellId,DelayCnts,AddrCnt,DataBytes);
+          
+   } /* End dwell ID loop */
+
+   return true;
+   
+} /* End AcceptDwellTableLoad() */
+
+
+/******************************************************************************
+** Function: SendDwellTlm
+**
+** Notes:
+**   1. The following fields are loaded when a dwell table load is accepted:
+**      DwellId, Name, Delay, AddressCnt, DataByteLen
+**
+*/
+static void SendDwellTlm(MEM_MGR_DwellTlm_t *DwellTlm, uint16 DataByteLen)
+{
+ /*
+   uint16 DwellPktSize;
+
+   DwellPktSize = sizeof(MEM_MGR_DwellTlm_t) - MEM_MGR_DWELL_ENTRIES*4 + DataByteLen;
+   CFE_MSG_SetSize(CFE_MSG_PTR(DwellTlm->TelemetryHeader), DwellPktSize);
+*/
+OS_printf("SendDwellTlm()\n");
+   CFE_SB_TimeStampMsg(CFE_MSG_PTR(DwellTlm->TelemetryHeader));
+   CFE_SB_TransmitMsg(CFE_MSG_PTR(DwellTlm->TelemetryHeader), true);
+
+} /* End SendDwellTlm() */
 
 
 /******************************************************************************

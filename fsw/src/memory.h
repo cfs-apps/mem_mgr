@@ -39,17 +39,19 @@
 ** Event Message IDs
 */
 
-#define MEMORY_DIS_EEPROM_WRITE_EID  (MEMORY_BASE_EID + 0)
-#define MEMORY_DUMP_TO_EVENT_EID     (MEMORY_BASE_EID + 1)
-#define MEMORY_ENA_EEPROM_WRITE_EID  (MEMORY_BASE_EID + 2)
-#define MEMORY_FILL_CMD_EID          (MEMORY_BASE_EID + 3)
-#define MEMORY_LOOKUP_SYMBOL_EID     (MEMORY_BASE_EID + 4)
-#define MEMORY_LOAD_INT_DIS_EID      (MEMORY_BASE_EID + 5)
-#define MEMORY_PEEK_CMD_EID          (MEMORY_BASE_EID + 6)
-#define MEMORY_POKE_CMD_EID          (MEMORY_BASE_EID + 7)
-#define MEMORY_CREATE_CPU_ADDR_EID   (MEMORY_BASE_EID + 8)
-#define MEMORY_GET_PSP_MEM_TYPE_EID  (MEMORY_BASE_EID + 9)
-#define MEMORY_VER_CPU_ADDR_EID      (MEMORY_BASE_EID + 10)
+#define MEMORY_DIS_EEPROM_WRITE_EID  (MEMORY_BASE_EID +  0)
+#define MEMORY_DUMP_TO_EVENT_EID     (MEMORY_BASE_EID +  1)
+#define MEMORY_ENA_EEPROM_WRITE_EID  (MEMORY_BASE_EID +  2)
+#define MEMORY_FILL_CMD_EID          (MEMORY_BASE_EID +  3)
+#define MEMORY_LOOKUP_SYMBOL_EID     (MEMORY_BASE_EID +  4)
+#define MEMORY_LOAD_INT_DIS_EID      (MEMORY_BASE_EID +  5)
+#define MEMORY_PEEK_CMD_EID          (MEMORY_BASE_EID +  6)
+#define MEMORY_POKE_CMD_EID          (MEMORY_BASE_EID +  7)
+#define MEMORY_READ_EID              (MEMORY_BASE_EID +  8)
+#define MEMORY_WRITE_EID             (MEMORY_BASE_EID +  9)
+#define MEMORY_CREATE_CPU_ADDR_EID   (MEMORY_BASE_EID + 10)
+#define MEMORY_GET_PSP_MEM_TYPE_EID  (MEMORY_BASE_EID + 11)
+#define MEMORY_VER_CPU_ADDR_EID      (MEMORY_BASE_EID + 12)
 
 
 /**********************/
@@ -60,7 +62,7 @@
 typedef struct
 {
    MEM_MGR_CpuAddr_Atom_t   CpuAddr;
-   char                    *TypeStr;
+   const char               *TypeStr;
       
 } MEMORY_VerifiedMemory_t;
 
@@ -181,6 +183,17 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
 
 
 /******************************************************************************
+** Function: MEMORY_Read
+**
+** Notes:
+**   None
+**
+*/
+uint8 MEMORY_Read(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemSize_Enum_t MemSize,
+                  uint32 *Data);
+                         
+
+/******************************************************************************
 ** Function:  MEMORY_ResetStatus
 **
 */
@@ -201,6 +214,17 @@ void MEMORY_SetCmdStatus(const MEMORY_CmdStatus_t *CmdStatus);
 
 
 /******************************************************************************
+** Function: MEMORY_TypeStr
+**
+** Notes:
+**   1. Returns a pointer to a string for each enumeration in
+**      MEM_MGR_MemType_Enum_t  
+**
+*/
+const char *MEMORY_TypeStr(MEM_MGR_MemType_Enum_t MemType);
+
+
+/******************************************************************************
 ** Function: MEMORY_VerifyAddr
 **
 ** Notes:
@@ -212,5 +236,15 @@ bool MEMORY_VerifyAddr(MEM_MGR_SymbolAddr_t SymbolAddr, MEM_MGR_MemType_Enum_t M
                        MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt, 
                        MEMORY_VerifiedMemory_t *VerifiedMemory);
 
+
+/******************************************************************************
+** Function: MEMORY_Write
+**
+** Notes:
+**   None
+**
+*/
+uint8 MEMORY_Write(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemType_Enum_t MemType, 
+                   const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize, uint32 Data);
 
 #endif /* _memory_ */

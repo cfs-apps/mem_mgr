@@ -44,9 +44,7 @@
 
 static bool CreateCpuAddr(MEM_MGR_SymbolAddr_t *SymbolAddr, MEM_MGR_CpuAddr_Atom_t *CpuAddr);
 static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t MemSize, uint32 FillData, uint32 ByteCnt);
-static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, char **MemTypeStr);
-static bool Peek(MEM_MGR_CpuAddr_Atom_t CpuAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize);
-static bool Poke(MEM_MGR_CpuAddr_Atom_t CpuAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize, uint32 Data);
+static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, const char **MemTypeStr);
 static bool ReadMemBlock(void *DestAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, MEM_MGR_MemSize_Enum_t SrcMemSize, uint32 ByteCnt);
 static bool SendDumpBufToEvent(MEM_MGR_CpuAddr_Atom_t CpuAddr, const uint8 *DumpBuf, uint32 ByteCnt);
 static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType, const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
@@ -57,9 +55,12 @@ static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType, con
 
 static MEMORY_Class_t *Memory = NULL;
 
-static char MEM_TYPE_EEPROM[] = "EEPROM";
-static char MEM_TYPE_RAM[]    = "RAM";
-static char MEM_TYPE_UNDEF[]  = "UNDEF";
+// MEM_MGR_MemType_Enum_t
+static const char *MemTypeStr[] = {
+   "UNDEF",   // MEM_MGR_MemType_UNDEF
+   "RAM",     // MEM_MGR_MemType_RAM
+   "NONVOL"   // MEM_MGR_MemType_NONVOL
+};
 
 //TODO: Decide how/where to define DumpToEventBuf[]
 static uint32 DumpToEventBuf[MEMORY_DUMP_TOEVENT_MAX_DWORDS];  // Defined to support 32-bit memory dumps
@@ -378,7 +379,9 @@ bool MEMORY_PeekCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
  
    const MEM_MGR_Peek_CmdPayload_t *PeekCmd = CMDMGR_PAYLOAD_PTR(MsgPtr, MEM_MGR_Peek_t);
  
-   bool RetStatus = false;
+   bool   RetStatus = false;
+   uint32 Data;
+   uint8  ByteCnt;
    MEMORY_VerifiedMemory_t VerifiedMemory;
 
    // MemSize enumeration value is used for the number of bytes parameter
@@ -386,14 +389,29 @@ bool MEMORY_PeekCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
                                  PeekCmd->MemSize, &VerifiedMemory);
    if (RetStatus == true)
    {
-      RetStatus = Peek(VerifiedMemory.CpuAddr, PeekCmd->MemType, VerifiedMemory.TypeStr, PeekCmd->MemSize);
+      ByteCnt = MEMORY_Read(VerifiedMemory, PeekCmd->MemSize, &Data);
+      if (ByteCnt > 0)
+      {
+         RetStatus = true;
+         Memory->CmdStatus.Function = MEM_MGR_MemFunction_PEEK;
+         Memory->CmdStatus.Type     = PeekCmd->MemType;
+         Memory->CmdStatus.Size     = PeekCmd->MemSize;
+         Memory->CmdStatus.Addr     = VerifiedMemory.CpuAddr;
+         Memory->CmdStatus.Data     = Data;
+         Memory->CmdStatus.ByteCnt  = ByteCnt;      
 
-      if (RetStatus == false)
+         CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                           "Peek %s Cmd: Addr=%p, Bytes=%u, Data=0x%08X",
+                           VerifiedMemory.TypeStr, (void*)VerifiedMemory.CpuAddr,
+                           ByteCnt, Data);
+      }
+      else
       {
          CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_ERROR,
-                           "Memory Manager Peek command failed for address %p", (void*)VerifiedMemory.CpuAddr);   
+                           "Memory Manager Peek command failed for address %p",
+                           (void*)VerifiedMemory.CpuAddr);   
       }
-   }
+   } /* End if valid address */
    
    return RetStatus;
     
@@ -413,7 +431,8 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
  
    const MEM_MGR_Poke_CmdPayload_t *PokeCmd = CMDMGR_PAYLOAD_PTR(MsgPtr, MEM_MGR_Poke_t);
  
-   bool RetStatus = false;
+   bool  RetStatus = false;
+   uint8 ByteCnt;
    MEMORY_VerifiedMemory_t VerifiedMemory;
 
    // MemSize enumeration value is used for the number of bytes parameter
@@ -421,17 +440,85 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
                                  PokeCmd->MemSize, &VerifiedMemory);
    if (RetStatus == true)
    {
-      RetStatus = Poke(VerifiedMemory.CpuAddr, PokeCmd->MemType, VerifiedMemory.TypeStr, PokeCmd->MemSize, PokeCmd->Data);
-      if (RetStatus != true)
+      ByteCnt = MEMORY_Write(VerifiedMemory, PokeCmd->MemType, VerifiedMemory.TypeStr,
+                             PokeCmd->MemSize, PokeCmd->Data);
+      if (ByteCnt > 0)
       {
-         CFE_EVS_SendEvent(MEMORY_POKE_CMD_EID, CFE_EVS_EventType_ERROR,
-                           "Memory Manager Poke command failed for address %p", (void*)VerifiedMemory.CpuAddr);     
+         RetStatus = true;
+         Memory->CmdStatus.Function  = MEM_MGR_MemFunction_POKE;
+         Memory->CmdStatus.Type      = PokeCmd->MemType;
+         Memory->CmdStatus.Size      = PokeCmd->MemSize;
+         Memory->CmdStatus.Addr      = VerifiedMemory.CpuAddr;
+         Memory->CmdStatus.Data      = PokeCmd->Data;
+         Memory->CmdStatus.ByteCnt   = ByteCnt;      
+
+         CFE_EVS_SendEvent(MEMORY_POKE_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                           "Poke %s Cmd: Addr=%p, Bytes=%u, Data=0x%08X",
+                           VerifiedMemory.TypeStr, (void*)VerifiedMemory.CpuAddr,
+                           ByteCnt, PokeCmd->Data);
       }
-   }
+      else
+      {   
+
+         CFE_EVS_SendEvent(MEMORY_POKE_CMD_EID, CFE_EVS_EventType_ERROR,
+                           "Memory Manager Poke command failed for address %p",
+                           (void*)VerifiedMemory.CpuAddr);     
+      }
+   } /* End if valid address */
    
    return RetStatus;
     
 } /* End MEMORY_PokeCmd() */
+
+
+/******************************************************************************
+** Function: MEMORY_Read
+**
+** Notes:
+**   1. After all command validation is performed, this function is called to
+**      do the memory read.
+**   2. From an OO design perspective this is a virtual read function dispatcher
+**
+*/
+uint8 MEMORY_Read(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemSize_Enum_t MemSize,
+                  uint32 *Data)
+{
+
+   uint32  ByteCnt = 0;
+   bool    ValidRead = false;
+   
+   switch (MemSize)
+   {
+      case MEM_MGR_MemSize_8:
+         ByteCnt = 1;
+         ValidRead = MEM_SIZE8_Read((uint8*)VerifiedMemory.CpuAddr, (uint8*)Data);
+         break;
+      case MEM_MGR_MemSize_16:
+         ByteCnt = 2;
+         ValidRead = MEM_SIZE16_Read((uint16*)VerifiedMemory.CpuAddr, (uint16*)Data);
+         break;
+      case MEM_MGR_MemSize_32:
+         ByteCnt = 4;
+         ValidRead = MEM_SIZE32_Read((uint32*)VerifiedMemory.CpuAddr, Data);
+         break;
+      default:
+         ValidRead = true; // Avoid read error event
+         CFE_EVS_SendEvent(MEMORY_READ_EID, CFE_EVS_EventType_ERROR,
+                           "Invalid memory read size %d, it must be either %d, %d or %d",
+                           MemSize,MEM_MGR_MemSize_8,MEM_MGR_MemSize_16,MEM_MGR_MemSize_32); 
+         break;
+   } /* End mem size switch */
+   
+   if (!ValidRead)
+   {
+      CFE_EVS_SendEvent(MEMORY_READ_EID, CFE_EVS_EventType_ERROR,
+                        "Unsuccessful %d byte memory read from %s",
+                        MemSize, VerifiedMemory.TypeStr);       
+   }
+   
+   return ByteCnt;
+    
+} /* End MEMORY_Read() */
 
 
 /******************************************************************************
@@ -440,7 +527,8 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 */
 void MEMORY_ResetStatus(void)
 {
-   //TODO: Should anything be reset?
+   
+   // Nothing to reset
    
 } /* End MEMORY_ResetStatus() */
 
@@ -464,6 +552,26 @@ void MEMORY_SetCmdStatus(const MEMORY_CmdStatus_t *CmdStatus)
 
 
 /******************************************************************************
+** Function: MEMORY_TypeStr
+**
+** Notes:
+**   1. Returns a pointer to a string for each enumeration in
+**      MEM_MGR_MemType_Enum_t  
+**
+*/
+const char *MEMORY_TypeStr(MEM_MGR_MemType_Enum_t MemType)
+{
+   uint8 i = 0;
+   
+   if (MemType >= MEM_MGR_MemType_Enum_t_MIN && MemType <= MEM_MGR_MemType_Enum_t_MAX)
+      i = MemType - 1;
+  
+   return MemTypeStr[i];
+   
+} /* MEMORY_TypeStr() */
+
+
+/******************************************************************************
 ** Function: MEMORY_VerifyAddr
 **
 ** Notes:
@@ -481,7 +589,7 @@ bool MEMORY_VerifyAddr(MEM_MGR_SymbolAddr_t SymbolAddr, MEM_MGR_MemType_Enum_t M
    uint32                PspMemType;
 
    VerifiedMemory->CpuAddr = 0;
-   VerifiedMemory->TypeStr = MEM_TYPE_UNDEF;
+   VerifiedMemory->TypeStr = MEMORY_TypeStr(MEM_MGR_MemType_UNDEF);
    
    // Create local SymbolAddr copy since it may get modified
    LocalSymbolAddr = SymbolAddr;
@@ -503,6 +611,56 @@ bool MEMORY_VerifyAddr(MEM_MGR_SymbolAddr_t SymbolAddr, MEM_MGR_MemType_Enum_t M
    return RetStatus;
    
 } /* End MEMORY_VerifyAddr() */
+
+
+/******************************************************************************
+** Function: MEMORY_Write
+**
+** Notes:
+**   1. After all command validation is performed, this function is called to
+**      do the memory write
+**   2. From an OO design perspective this is a virtual write function dispatcher
+**
+*/
+uint8 MEMORY_Write(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemType_Enum_t MemType, 
+                   const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize, uint32 Data)
+{
+
+   uint32  ByteCnt = 0;
+   bool    ValidWrite = false;
+
+   switch (MemSize)
+   {
+      case MEM_MGR_MemSize_8:
+         ByteCnt = 1;
+         ValidWrite = MEM_SIZE8_Write((uint8*)VerifiedMemory.CpuAddr, MemType, MemTypeStr, (uint8)Data);
+         break;
+      case MEM_MGR_MemSize_16:
+         ByteCnt = 2;
+         ValidWrite = MEM_SIZE16_Write((uint16*)VerifiedMemory.CpuAddr, MemType, MemTypeStr, (uint16)Data);
+         break;
+      case MEM_MGR_MemSize_32:
+         ByteCnt = 4;
+         ValidWrite = MEM_SIZE32_Write((uint32*)VerifiedMemory.CpuAddr, MemType, MemTypeStr, Data);
+         break;
+      default:
+         ValidWrite = true; // Avoid write error event
+         CFE_EVS_SendEvent(MEMORY_WRITE_EID, CFE_EVS_EventType_ERROR,
+                           "Invalid memory write size %d, it must be either %d, %d or %d",
+                           MemSize,MEM_MGR_MemSize_8,MEM_MGR_MemSize_16,MEM_MGR_MemSize_32); 
+         break;
+   } /* End mem size switch */
+   
+   if (!ValidWrite)
+   {
+      CFE_EVS_SendEvent(MEMORY_WRITE_EID, CFE_EVS_EventType_ERROR,
+                        "Unsuccessful %d byte memory write to %s",
+                        MemSize, VerifiedMemory.TypeStr);       
+   }
+   
+   return ByteCnt;
+    
+} /* End MEMORY_Write() */
 
 
 /******************************************************************************
@@ -597,24 +755,24 @@ static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t
 **      defnition
 **
 */
-static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, char **MemTypeStr)
+static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, const char **MemTypeStr)
 {
    bool   RetStatus = false;
    
    *PspMemType = CFE_PSP_MEM_INVALID;
-   *MemTypeStr = MEM_TYPE_UNDEF;
+   *MemTypeStr = MEMORY_TypeStr(MEM_MGR_MemType_UNDEF);
 
    switch (MemType)
    {
       case MEM_MGR_MemType_NONVOL:
          RetStatus   = true;
          *PspMemType = CFE_PSP_MEM_EEPROM;
-         *MemTypeStr = MEM_TYPE_EEPROM;
+         *MemTypeStr = MEMORY_TypeStr(MEM_MGR_MemType_NONVOL);
          break;
       case MEM_MGR_MemType_RAM:
          RetStatus   = true;
          *PspMemType = CFE_PSP_MEM_RAM;
-         *MemTypeStr = MEM_TYPE_RAM;
+         *MemTypeStr = MEMORY_TypeStr(MEM_MGR_MemType_RAM);
          break;
       default:
          CFE_EVS_SendEvent(MEMORY_GET_PSP_MEM_TYPE_EID, CFE_EVS_EventType_ERROR,
@@ -625,116 +783,6 @@ static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, ch
    return RetStatus;
 
 } /* End GetPspMemType() */
-
-
-/******************************************************************************
-** Function: Peek
-**
-** Notes:
-**   1. After all command validation is performed, this function is called to
-**      do the memory peek and sends the command's success event message
-**   2. From an OO design perspective this is a virtual function dispatcher
-**
-*/
-static bool Peek(MEM_MGR_CpuAddr_Atom_t CpuAddr, MEM_MGR_MemType_Enum_t MemType, 
-                 const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize)
-{
-
-   bool   RetStatus = false;
-   uint32 Data      = 0;
-   uint32 ByteCnt   = 0;
-
-   //TODO: Report invalid memory types for peeks
-   switch (MemSize)
-   {
-      case MEM_MGR_MemSize_8:
-         ByteCnt = 1;
-         RetStatus = MEM_SIZE8_Peek((uint8*)CpuAddr, (uint8*)&Data);
-         break;
-      case MEM_MGR_MemSize_16:
-         ByteCnt = 2;
-         RetStatus = MEM_SIZE16_Peek((uint16*)CpuAddr, (uint16*)&Data);
-         break;
-      case MEM_MGR_MemSize_32:
-         ByteCnt = 4;
-         RetStatus = MEM_SIZE32_Peek((uint32*)CpuAddr, &Data);
-         break;
-      default:
-         break;
-   } /* End mem size switch */
-   
-   //TODO: Set peek status in the main command function. Make all commands consistent. Think about success event message  
-   if (RetStatus == true)
-   {
-      Memory->CmdStatus.Function = MEM_MGR_MemFunction_PEEK;
-      Memory->CmdStatus.Type     = MemType;
-      Memory->CmdStatus.Size     = MemSize;
-      Memory->CmdStatus.Addr     = CpuAddr;
-      Memory->CmdStatus.Data     = Data;
-      Memory->CmdStatus.ByteCnt  = ByteCnt;      
-
-      CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_INFORMATION,
-                        "Peek %s Cmd: Addr=%p, Bytes=%u, Data=0x%08X",
-                        MemTypeStr, (void*)CpuAddr, ByteCnt, Data);
-   }
-   
-   return RetStatus;
-    
-} /* End Peek() */
-
-
-/******************************************************************************
-** Function: Poke
-**
-** Notes:
-**   1. After all command validation is performed, this function is called to
-**      do the memory poke and sends the command's success event message
-**   2. From an OO design perspective this is a virtual function dispatcher
-**
-*/
-static bool Poke(MEM_MGR_CpuAddr_Atom_t CpuAddr, MEM_MGR_MemType_Enum_t MemType, 
-                 const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize, uint32 Data)
-{
-
-   bool    RetStatus = false;
-   uint32  ByteCnt = 0;
-
-   //TODO: Report invalid memory types for pokes
-   switch (MemSize)
-   {
-      case MEM_MGR_MemSize_8:
-         ByteCnt = 1;
-         RetStatus = MEM_SIZE8_Poke((uint8*)CpuAddr, MemType, MemTypeStr, (uint8)Data);
-         break;
-      case MEM_MGR_MemSize_16:
-         ByteCnt = 2;
-         RetStatus = MEM_SIZE16_Poke((uint16*)CpuAddr, MemType, MemTypeStr, (uint16)Data);
-         break;
-      case MEM_MGR_MemSize_32:
-         ByteCnt = 4;
-         RetStatus = MEM_SIZE32_Poke((uint32*)CpuAddr, MemType, MemTypeStr, Data);
-         break;
-      default:
-         break;
-   } /* End mem size switch */
-   
-   if (RetStatus == true)
-   {
-      Memory->CmdStatus.Function  = MEM_MGR_MemFunction_PEEK;
-      Memory->CmdStatus.Type      = MemType;
-      Memory->CmdStatus.Size      = MemSize;
-      Memory->CmdStatus.Addr      = CpuAddr;
-      Memory->CmdStatus.Data      = Data;
-      Memory->CmdStatus.ByteCnt   = ByteCnt;      
-
-      CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_INFORMATION,
-                        "Poke %s Cmd: Addr=%p, Bytes=%u, Data=0x%08X",
-                        MemTypeStr, (void*)CpuAddr, ByteCnt, Data);
-   }
-   
-   return RetStatus;
-    
-} /* End Poke() */
 
 
 /******************************************************************************

@@ -31,6 +31,7 @@
 
 #include <string.h>
 #include "cfe_endian.h"
+#include "memory.h"
 #include "mem_dwell_tbl.h"
 
 
@@ -48,6 +49,7 @@
 /** Local File Function Prototypes **/
 /************************************/
 
+static bool ComputeDataLen(MEM_MGR_MemSize_Enum_t MemSize,uint16 *DataLen);
 static bool LoadJsonData(size_t JsonFileLen);
 static bool ValidTblData(void);
 static void WriteDwellTable(osal_id_t FileHandle, uint16 id);
@@ -57,62 +59,63 @@ static void WriteDwellTable(osal_id_t FileHandle, uint16 id);
 /**********************/
 
 static MEM_DWELL_TBL_Class_t  *MemDwellTbl = NULL;
-static MEM_DWELL_TBL_Dwell_t  Dwell[MEM_MGR_DWELL_ID_CNT];   /* Working buffer for loads */
+static MEM_DWELL_TBL_Dwell_t  DwellTbl[MEM_MGR_DWELL_ID_CNT];   /* Working buffer for loads */
 
 
 #define ID_SIZE        sizeof(uint16)
 #define NAME_SIZE      sizeof(MEM_MGR_DwellName_String_t)
 #define TOPIC_ID_SIZE  sizeof(uint16)
 #define ENABLED_SIZE   JSON_MAX_KW_LEN
-#define LENGTH_SIZE    sizeof(uint16)
+#define DATA_LEN_SIZE  sizeof(uint16)
 #define DELAY_SIZE     sizeof(uint16)
 #define SYM_NAME_SIZE  MEM_MGR_MAX_SYM_LEN
 #define OFFSET_SIZE    sizeof(cpuaddr)
 
 static CJSON_Obj_t JsonTblObjs[] = {
 
-   /* Table Data Address                 Table Data Size, Updated, Data Type,  Float,  core-json query string, length of query string(exclude '\0') */
+   /* Table Data Address                    Table Data Size, Updated, Data Type,   Float,  core-json query string,             length of query string(exclude '\0') */
 
-   { &Dwell[0].Id,                         ID_SIZE,        false,   JSONNumber, false,  { "dwell[0].id",                     (sizeof("dwell[0].id")-1)}},
-   { &Dwell[0].Name,                       NAME_SIZE,      false,   JSONNumber, false,  { "dwell[0].name",                   (sizeof("dwell[0].name")-1)}},
-   { &Dwell[0].TopicId,                    TOPIC_ID_SIZE,  false,   JSONNumber, false,  { "dwell[0].topic-id",               (sizeof("dwell[0].topic-id")-1)}},
-   { &Dwell[0].EnaStr,                     ENABLED_SIZE,   false,   JSONString, false,  { "dwell[0].enabled",                (sizeof("dwell[0].enabled")-1)}},
-   { &Dwell[0].Entry[0].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[0].length",        (sizeof("dwell[0].entry[0].length")-1)}},
-   { &Dwell[0].Entry[0].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[0].delay",         (sizeof("dwell[0].entry[0].delay")-1)}},
-   { &Dwell[0].Entry[0].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[0].address.symbol",(sizeof("dwell[0].entry[0].address.symbol")-1)}},
-   { &Dwell[0].Entry[0].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[0].address.offset",(sizeof("dwell[0].entry[0].address.offset")-1)}},
-   { &Dwell[0].Entry[1].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[1].length",        (sizeof("dwell[0].entry[1].length")-1)}},
-   { &Dwell[0].Entry[1].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[1].delay",         (sizeof("dwell[0].entry[1].delay")-1)}},
-   { &Dwell[0].Entry[1].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[1].address.symbol",(sizeof("dwell[0].entry[1].address.symbol")-1)}},
-   { &Dwell[0].Entry[1].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[1].address.offset",(sizeof("dwell[0].entry[1].address.offset")-1)}},
-   { &Dwell[0].Entry[2].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[2].length",        (sizeof("dwell[0].entry[2].length")-1)}},
-   { &Dwell[0].Entry[2].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[2].delay",         (sizeof("dwell[0].entry[2].delay")-1)}},
-   { &Dwell[0].Entry[2].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[2].address.symbol",(sizeof("dwell[0].entry[2].address.symbol")-1)}},
-   { &Dwell[0].Entry[2].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[2].address.offset",(sizeof("dwell[0].entry[2].address.offset")-1)}},
-   { &Dwell[0].Entry[3].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[3].length",        (sizeof("dwell[0].entry[3].length")-1)}},
-   { &Dwell[0].Entry[3].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[3].delay",         (sizeof("dwell[0].entry[3].delay")-1)}},
-   { &Dwell[0].Entry[3].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[3].address.symbol",(sizeof("dwell[0].entry[3].address.symbol")-1)}},
-   { &Dwell[0].Entry[3].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[3].address.offset",(sizeof("dwell[0].entry[3].address.offset")-1)}},
+   { &DwellTbl[0].Id,                         ID_SIZE,        false,   JSONNumber, false,  { "dwell[0].id",                     (sizeof("dwell[0].id")-1)}},
+   { &DwellTbl[0].Name,                       NAME_SIZE,      false,   JSONNumber, false,  { "dwell[0].name",                   (sizeof("dwell[0].name")-1)}},
+   { &DwellTbl[0].TopicId,                    TOPIC_ID_SIZE,  false,   JSONNumber, false,  { "dwell[0].topic-id",               (sizeof("dwell[0].topic-id")-1)}},
+   { &DwellTbl[0].EnaStr,                     ENABLED_SIZE,   false,   JSONString, false,  { "dwell[0].enabled",                (sizeof("dwell[0].enabled")-1)}},
+   { &DwellTbl[0].Entry[0].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[0].entry[0].mem-size",      (sizeof("dwell[0].entry[0].mem-size")-1)}},
+   { &DwellTbl[0].Entry[0].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[0].delay",         (sizeof("dwell[0].entry[0].delay")-1)}},
+   { &DwellTbl[0].Entry[0].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[0].address.symbol",(sizeof("dwell[0].entry[0].address.symbol")-1)}},
+   { &DwellTbl[0].Entry[0].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[0].address.offset",(sizeof("dwell[0].entry[0].address.offset")-1)}},
+   { &DwellTbl[0].Entry[1].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[0].entry[1].mem-size",      (sizeof("dwell[0].entry[1].mem-size")-1)}},
+   { &DwellTbl[0].Entry[1].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[1].delay",         (sizeof("dwell[0].entry[1].delay")-1)}},
+   { &DwellTbl[0].Entry[1].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[1].address.symbol",(sizeof("dwell[0].entry[1].address.symbol")-1)}},
+   { &DwellTbl[0].Entry[1].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[1].address.offset",(sizeof("dwell[0].entry[1].address.offset")-1)}},
+   { &DwellTbl[0].Entry[2].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[0].entry[2].mem-size",      (sizeof("dwell[0].entry[2].mem-size")-1)}},
+   { &DwellTbl[0].Entry[2].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[2].delay",         (sizeof("dwell[0].entry[2].delay")-1)}},
+   { &DwellTbl[0].Entry[2].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[2].address.symbol",(sizeof("dwell[0].entry[2].address.symbol")-1)}},
+   { &DwellTbl[0].Entry[2].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[2].address.offset",(sizeof("dwell[0].entry[2].address.offset")-1)}},
+   { &DwellTbl[0].Entry[3].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[0].entry[3].mem-size",      (sizeof("dwell[0].entry[3].mem-size")-1)}},
+   { &DwellTbl[0].Entry[3].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[0].entry[3].delay",         (sizeof("dwell[0].entry[3].delay")-1)}},
+   { &DwellTbl[0].Entry[3].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[0].entry[3].address.symbol",(sizeof("dwell[0].entry[3].address.symbol")-1)}},
+   { &DwellTbl[0].Entry[3].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[0].entry[3].address.offset",(sizeof("dwell[0].entry[3].address.offset")-1)}},
 
-   { &Dwell[1].Id,                         ID_SIZE,        false,   JSONNumber, false,  { "dwell[1].id",                     (sizeof("dwell[1].id")-1)}},
-   { &Dwell[1].TopicId,                    TOPIC_ID_SIZE,  false,   JSONNumber, false,  { "dwell[1].topic-id",               (sizeof("dwell[1].topic-id")-1)}},
-   { &Dwell[1].EnaStr,                     ENABLED_SIZE,   false,   JSONString, false,  { "dwell[1].enabled",                (sizeof("dwell[1].enabled")-1)}},
-   { &Dwell[1].Entry[0].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[0].length",        (sizeof("dwell[1].entry[0].length")-1)}},
-   { &Dwell[1].Entry[0].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[0].delay",         (sizeof("dwell[1].entry[0].delay")-1)}},
-   { &Dwell[1].Entry[0].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[0].address.symbol",(sizeof("dwell[1].entry[0].address.symbol")-1)}},
-   { &Dwell[1].Entry[0].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[0].address.offset",(sizeof("dwell[1].entry[0].address.offset")-1)}},
-   { &Dwell[1].Entry[1].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[1].length",        (sizeof("dwell[1].entry[1].length")-1)}},
-   { &Dwell[1].Entry[1].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[1].delay",         (sizeof("dwell[1].entry[1].delay")-1)}},
-   { &Dwell[1].Entry[1].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[1].address.symbol",(sizeof("dwell[1].entry[1].address.symbol")-1)}},
-   { &Dwell[1].Entry[1].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[1].address.offset",(sizeof("dwell[1].entry[1].address.offset")-1)}},
-   { &Dwell[1].Entry[2].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[2].length",        (sizeof("dwell[1].entry[2].length")-1)}},
-   { &Dwell[1].Entry[2].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[2].delay",         (sizeof("dwell[1].entry[2].delay")-1)}},
-   { &Dwell[1].Entry[2].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[2].address.symbol",(sizeof("dwell[1].entry[2].address.symbol")-1)}},
-   { &Dwell[1].Entry[2].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[2].address.offset",(sizeof("dwell[1].entry[2].address.offset")-1)}},
-   { &Dwell[1].Entry[3].Length,            LENGTH_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[3].length",        (sizeof("dwell[1].entry[3].length")-1)}},
-   { &Dwell[1].Entry[3].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[3].delay",         (sizeof("dwell[1].entry[3].delay")-1)}},
-   { &Dwell[1].Entry[3].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[3].address.symbol",(sizeof("dwell[1].entry[3].address.symbol")-1)}},
-   { &Dwell[1].Entry[3].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[3].address.offset",(sizeof("dwell[1].entry[3].address.offset")-1)}},
+   { &DwellTbl[1].Id,                         ID_SIZE,        false,   JSONNumber, false,  { "dwell[1].id",                     (sizeof("dwell[1].id")-1)}},
+   { &DwellTbl[1].Name,                       NAME_SIZE,      false,   JSONNumber, false,  { "dwell[1].name",                   (sizeof("dwell[1].name")-1)}},
+   { &DwellTbl[1].TopicId,                    TOPIC_ID_SIZE,  false,   JSONNumber, false,  { "dwell[1].topic-id",               (sizeof("dwell[1].topic-id")-1)}},
+   { &DwellTbl[1].EnaStr,                     ENABLED_SIZE,   false,   JSONString, false,  { "dwell[1].enabled",                (sizeof("dwell[1].enabled")-1)}},
+   { &DwellTbl[1].Entry[0].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[1].entry[0].mem-size",      (sizeof("dwell[1].entry[0].mem-size")-1)}},
+   { &DwellTbl[1].Entry[0].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[0].delay",         (sizeof("dwell[1].entry[0].delay")-1)}},
+   { &DwellTbl[1].Entry[0].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[0].address.symbol",(sizeof("dwell[1].entry[0].address.symbol")-1)}},
+   { &DwellTbl[1].Entry[0].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[0].address.offset",(sizeof("dwell[1].entry[0].address.offset")-1)}},
+   { &DwellTbl[1].Entry[1].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[1].entry[1].mem-size",      (sizeof("dwell[1].entry[1].mem-size")-1)}},
+   { &DwellTbl[1].Entry[1].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[1].delay",         (sizeof("dwell[1].entry[1].delay")-1)}},
+   { &DwellTbl[1].Entry[1].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[1].address.symbol",(sizeof("dwell[1].entry[1].address.symbol")-1)}},
+   { &DwellTbl[1].Entry[1].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[1].address.offset",(sizeof("dwell[1].entry[1].address.offset")-1)}},
+   { &DwellTbl[1].Entry[2].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[1].entry[2].mem-size",      (sizeof("dwell[1].entry[2].mem-size")-1)}},
+   { &DwellTbl[1].Entry[2].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[2].delay",         (sizeof("dwell[1].entry[2].delay")-1)}},
+   { &DwellTbl[1].Entry[2].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[2].address.symbol",(sizeof("dwell[1].entry[2].address.symbol")-1)}},
+   { &DwellTbl[1].Entry[2].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[2].address.offset",(sizeof("dwell[1].entry[2].address.offset")-1)}},
+   { &DwellTbl[1].Entry[3].MemSize,           DATA_LEN_SIZE,  false,   JSONNumber, false,  { "dwell[1].entry[3].mem-size",      (sizeof("dwell[1].entry[3].mem-size")-1)}},
+   { &DwellTbl[1].Entry[3].Delay,             DELAY_SIZE,     false,   JSONNumber, false,  { "dwell[1].entry[3].delay",         (sizeof("dwell[1].entry[3].delay")-1)}},
+   { &DwellTbl[1].Entry[3].SymbolAddr.Name,   SYM_NAME_SIZE,  false,   JSONString, false,  { "dwell[1].entry[3].address.symbol",(sizeof("dwell[1].entry[3].address.symbol")-1)}},
+   { &DwellTbl[1].Entry[3].SymbolAddr.Offset, OFFSET_SIZE,    false,   JSONNumber, false,  { "dwell[1].entry[3].address.offset",(sizeof("dwell[1].entry[3].address.offset")-1)}},
 
 };
 
@@ -124,14 +127,16 @@ static CJSON_Obj_t JsonTblObjs[] = {
 **    1. This must be called prior to any other functions
 **
 */
-void MEM_DWELL_TBL_Constructor(MEM_DWELL_TBL_Class_t *ObjPtr)
+void MEM_DWELL_TBL_Constructor(MEM_DWELL_TBL_Class_t *ObjPtr,
+                               MEM_DWELL_TBL_OwnerAcceptFunc_t OwnerAcceptFunc)
 {
    
    MemDwellTbl = ObjPtr;
 
    CFE_PSP_MemSet(MemDwellTbl, 0, sizeof(MEM_DWELL_TBL_Class_t));
    
-   MemDwellTbl->JsonObjCnt = (sizeof(JsonTblObjs)/sizeof(CJSON_Obj_t));
+   MemDwellTbl->OwnerAcceptFunc = OwnerAcceptFunc;
+   MemDwellTbl->JsonObjCnt      = (sizeof(JsonTblObjs)/sizeof(CJSON_Obj_t));
    
 } /* End MEM_DWELL_TBL_Constructor() */
 
@@ -179,6 +184,24 @@ bool MEM_DWELL_TBL_DumpCmd(osal_id_t FileHandle)
 
 
 /******************************************************************************
+** Function: MEM_DWELL_TBL_EntryMemSizeEnabled
+**
+** Notes:
+**   1. Use MemSize to determine whether an entry is enabled.
+**   2. See ValidTblData() for additonal details on disabled entries.
+** 
+*/
+bool MEM_DWELL_TBL_EntryMemSizeEnabled(const MEM_DWELL_TBL_Dwell_Entry_t *Entry)
+{
+
+   return ((Entry->MemSize == MEM_MGR_MemSize_8)  ||
+           (Entry->MemSize == MEM_MGR_MemSize_16) ||
+           (Entry->MemSize == MEM_MGR_MemSize_32));
+
+} /* End MEM_DWELL_TBL_EntryMemSizeEnabled() */
+
+
+/******************************************************************************
 ** Function: MEM_DWELL_TBL_LoadCmd
 **
 ** Notes:
@@ -193,13 +216,48 @@ bool MEM_DWELL_TBL_LoadCmd(APP_C_FW_TblLoadOptions_Enum_t LoadType, const char *
 
    if (CJSON_ProcessFile(Filename, MemDwellTbl->JsonBuf, MEM_DWELL_TBL_JSON_FILE_MAX_CHAR, LoadJsonData))
    {
-      MemDwellTbl->Loaded = true;
+      MemDwellTbl->Loaded = true;      
       RetStatus = true;   
    }
 
    return RetStatus;
    
 } /* End MEM_DWELL_TBL_LoadCmd() */
+
+
+/******************************************************************************
+** Function: MEM_DWELL_TBL_LoadEntry
+**
+** Notes:
+**  1. Validates and loads a dwell entry
+**  2. Assumes MemSize type defines number of bytes (see mem_mgr.xml)
+**
+*/
+bool MEM_DWELL_TBL_LoadEntry(MEM_DWELL_TBL_Dwell_Entry_t *Entry,
+                             uint16 Delay,
+                             MEM_MGR_MemSize_Enum_t MemSize,
+                             MEM_MGR_SymbolAddr_t SymbolAddr)
+{
+   bool    RetStatus = false;
+   uint16  DataLen;
+   MEMORY_VerifiedMemory_t VerifiedMemory;
+   
+   if (ComputeDataLen(MemSize,&DataLen))
+   {
+      if (MEMORY_VerifyAddr(SymbolAddr, MEM_MGR_MemType_RAM, MemSize,
+                            DataLen, &VerifiedMemory))
+      {
+         Entry->MemSize        = DataLen;
+         Entry->Delay          = Delay;
+         Entry->SymbolAddr     = SymbolAddr;
+         Entry->VerifiedMemory = VerifiedMemory;
+         RetStatus = true;
+      }
+   }
+
+   return RetStatus;
+   
+} /* End MEM_DWELL_TBL_LoadEntry() */
 
 
 /******************************************************************************
@@ -212,6 +270,37 @@ void MEM_DWELL_TBL_ResetStatus(void)
    MemDwellTbl->LastLoadCnt = 0;
     
 } /* End MEM_DWELL_TBL_ResetStatus() */
+
+
+/******************************************************************************
+** Function: ComputeDataLen
+**
+*/
+static bool ComputeDataLen(MEM_MGR_MemSize_Enum_t MemSize,uint16 *DataLen)
+{
+   
+   bool RetStatus = true;
+
+   *DataLen = 0;
+   switch (MemSize)
+   {
+      case MEM_MGR_MemSize_8:
+         *DataLen = 1;
+         break;
+      case MEM_MGR_MemSize_16:
+         *DataLen = 2;
+         break;
+      case MEM_MGR_MemSize_32:
+         *DataLen = 4;
+         break;
+      default:
+         RetStatus = false;
+         break;
+   } /* End mem size switch */
+
+   return RetStatus;
+      
+} /* End if ComputeDataLen() */
 
 
 /******************************************************************************
@@ -235,12 +324,12 @@ static bool LoadJsonData(size_t JsonFileLen)
    ** 2. Process JSON file which updates local table buffer with JSON supplied values
    ** 3. If valid, copy local buffer over owner's data 
    */
-   for (i= MEM_MGR_DwellId_Enum_t_MIN; i < MEM_MGR_DwellId_Enum_t_MAX; i++)
+   for (i= MEM_MGR_DwellId_Enum_t_MIN; i <= MEM_MGR_DwellId_Enum_t_MAX; i++)
    {
-      memcpy((void*)MEM_DWELL_TBL_PTR(Dwell,i), (void*)MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,i),
+      memcpy((void*)MEM_DWELL_TBL_PTR(DwellTbl,i), (void*)MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,i),
              sizeof(MEM_DWELL_TBL_Dwell_t));
    }
-   
+
    ObjLoadCnt = CJSON_LoadObjArray(JsonTblObjs, MemDwellTbl->JsonObjCnt, MemDwellTbl->JsonBuf, MemDwellTbl->JsonFileLen);
 
    if (!MemDwellTbl->Loaded && (ObjLoadCnt != MemDwellTbl->JsonObjCnt))
@@ -256,16 +345,26 @@ static bool LoadJsonData(size_t JsonFileLen)
 
       if (ValidTblData())
       {
-         for (i= MEM_MGR_DwellId_Enum_t_MIN; i < MEM_MGR_DwellId_Enum_t_MAX; i++)
+         bool OwnerAcceptedTbl = true;
+         if (MemDwellTbl->OwnerAcceptFunc != NULL)
          {
-            memcpy((void*)MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,i),
-                   (void*)MEM_DWELL_TBL_PTR(Dwell,i), sizeof(MEM_DWELL_TBL_Dwell_t));
+            OwnerAcceptedTbl = (MemDwellTbl->OwnerAcceptFunc)(DwellTbl);
          }
-         MemDwellTbl->LastLoadCnt = ObjLoadCnt;
-         CFE_EVS_SendEvent(MEM_DWELL_TBL_LOAD_EID, CFE_EVS_EventType_DEBUG, 
-                           "Successfully loaded %d JSON objects",
-                           (unsigned int)ObjLoadCnt);
-         RetStatus = true;
+         if (OwnerAcceptedTbl)
+         {
+
+            for (i= MEM_MGR_DwellId_Enum_t_MIN; i <= MEM_MGR_DwellId_Enum_t_MAX; i++)
+            {
+               memcpy((void*)MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,i),
+                      (void*)MEM_DWELL_TBL_PTR(DwellTbl,i), sizeof(MEM_DWELL_TBL_Dwell_t));
+            }
+
+            MemDwellTbl->LastLoadCnt = ObjLoadCnt;
+            CFE_EVS_SendEvent(MEM_DWELL_TBL_LOAD_EID, CFE_EVS_EventType_DEBUG, 
+                              "Successfully loaded %d JSON objects",
+                              (unsigned int)ObjLoadCnt);
+            RetStatus = true;
+         }
       }
       
    } /* End if valid JSON obj count */
@@ -285,30 +384,31 @@ static bool LoadJsonData(size_t JsonFileLen)
 static bool ValidTblData(void)
 {
    bool    RetStatus = true;
+   bool    EntryLoaded;
    uint16  id, i;
-   MEM_DWELL_TBL_Dwell_t *DwellTbl;
-
+   MEM_DWELL_TBL_Dwell_t       *DwellTblPtr;
+   MEM_DWELL_TBL_Dwell_Entry_t *Entry;
  
    for (id=1; id <= MEM_MGR_DWELL_ID_CNT; id++)
    {
-      DwellTbl = MEM_DWELL_TBL_PTR(Dwell,id);
-      if (DwellTbl->Id != id)
+      DwellTblPtr = MEM_DWELL_TBL_PTR(DwellTbl,id);
+      if (DwellTblPtr->Id != id)
       {
          CFE_EVS_SendEvent(MEM_DWELL_TBL_VALID_EID, CFE_EVS_EventType_ERROR, 
                            "Invalid table ID %d, it must match physical table ID %d",
-                           DwellTbl->Id, id);
+                           DwellTblPtr->Id, id);
          RetStatus = false;
       }
       if (RetStatus)
       {
-         DwellTbl->Enabled = (strcmp(DwellTbl->EnaStr, "true") == 0);
-         if (!DwellTbl->Enabled)
+         DwellTblPtr->Enabled = (strcmp(DwellTblPtr->EnaStr, "true") == 0);
+         if (!DwellTblPtr->Enabled)
          {
-            if (strcmp(DwellTbl->EnaStr, "false") != 0)
+            if (strcmp(DwellTblPtr->EnaStr, "false") != 0)
             {
                CFE_EVS_SendEvent(MEM_DWELL_TBL_VALID_EID, CFE_EVS_EventType_ERROR, 
                                  "Invalid enable string %s. It must be either 'true' or 'false'",
-                                 DwellTbl->EnaStr);
+                                 DwellTblPtr->EnaStr);
                RetStatus = false;
             }
          }
@@ -317,7 +417,13 @@ static bool ValidTblData(void)
       {
          for (i=0; i < MEM_MGR_DWELL_ENTRIES; i++)
          {
-            //TODO: Add entry validation
+            Entry = &DwellTblPtr->Entry[i];
+            EntryLoaded = MEM_DWELL_TBL_LoadEntry(Entry, Entry->Delay,Entry->MemSize,Entry->SymbolAddr);
+            if (!EntryLoaded)
+            {
+               Entry->VerifiedMemory.CpuAddr = 0;
+               Entry->VerifiedMemory.TypeStr = MEMORY_TypeStr(MEM_MGR_MemType_UNDEF);
+            }
          }
       }      
    } /* End table ID loop */
@@ -335,12 +441,12 @@ static void WriteDwellTable(osal_id_t FileHandle, uint16 id)
 {
    uint16 i;
    char   DumpRecord[256];
-   MEM_DWELL_TBL_Dwell_t *DwellTbl;
+   MEM_DWELL_TBL_Dwell_t *DwellTblPtr;
 
-   DwellTbl = MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,id);
+   DwellTblPtr = MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,id);
    
    sprintf(DumpRecord,"      {\n         \"id\": %d,\n         \"name\": \"%s\",\n         \"topic-id\": %d,\n         \"enabled\": \"%s\",\n         \"entry\": [\n",
-           id, DwellTbl->Name, DwellTbl->TopicId, DwellTbl->EnaStr);
+           id, DwellTblPtr->Name, DwellTblPtr->TopicId, DwellTblPtr->EnaStr);
    OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
          
    for (i=0; i < MEM_MGR_DWELL_ENTRIES; i++)
@@ -350,8 +456,8 @@ static void WriteDwellTable(osal_id_t FileHandle, uint16 id)
          sprintf(DumpRecord,",\n");
          OS_write(FileHandle, DumpRecord, strlen(DumpRecord));      
       }
-      sprintf(DumpRecord,"            { \"length\": %d, \"delay\": %d, \"address\": {\"symbol\": \"%s\", \"offset\": %ld}}",
-              DwellTbl->Entry[i].Length, DwellTbl->Entry[i].Delay, DwellTbl->Entry[i].SymbolAddr.Name, DwellTbl->Entry[i].SymbolAddr.Offset);
+      sprintf(DumpRecord,"            { \"mem-size\": %d, \"delay\": %d, \"address\": {\"symbol\": \"%s\", \"offset\": %ld}}",
+              DwellTblPtr->Entry[i].MemSize, DwellTblPtr->Entry[i].Delay, DwellTblPtr->Entry[i].SymbolAddr.Name, DwellTblPtr->Entry[i].SymbolAddr.Offset);
       OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
    }
    

@@ -294,11 +294,11 @@
       <ContainerDataType name="DwellStatus" shortDescription="State of each dwell">
         <EntryList>
           <Entry name="Enabled"     type="APP_C_FW/ConfigEnaState" shortDescription="" />
-          <Entry name="DelayCnt"    type="BASE_TYPES/uint16"       shortDescription="Number of dwell delays in table/message" />
-          <Entry name="AddressCnt"  type="BASE_TYPES/uint16"       shortDescription="Number of dwell addresses in table/message" />
+          <Entry name="DelayCnt"    type="BASE_TYPES/uint16"       shortDescription="Sum of dwell table entry delays" />
+          <Entry name="EntryCnt"    type="BASE_TYPES/uint16"       shortDescription="Number of dwell table entries with addresses" />
           <Entry name="ByteCnt"     type="BASE_TYPES/uint16"       shortDescription="Number of bytes of data in the message" /> 
-          <Entry name="WriteOffset" type="BASE_TYPES/uint16"       shortDescription="Current write offset within dwell pkt data region" /> 
-          <Entry name="NextEntry"   type="BASE_TYPES/uint16"       shortDescription="Next table entry to be processed" /> 
+          <Entry name="DataOffset"  type="BASE_TYPES/uint16"       shortDescription="Current write offset within dwell pkt data region" /> 
+          <Entry name="EntryIndex"  type="BASE_TYPES/uint16"       shortDescription="Next table entry to be processed" /> 
           <Entry name="DelayTimer"  type="BASE_TYPES/uint16"       shortDescription="Current value of delay countdown timer" /> 
         </EntryList>
       </ContainerDataType>
@@ -327,10 +327,10 @@
       <ContainerDataType name="DwellTlm_Payload" shortDescription="">
         <EntryList>
           <Entry name="Id"          type="MEM_MGR/DwellId" />
+          <Entry name="Name"        type="MEM_MGR/DwellName" />
           <Entry name="Delay"       type="BASE_TYPES/uint16"  shortDescription="" />
           <Entry name="AddressCnt"  type="BASE_TYPES/uint16"  shortDescription="Number of dwell addresses " />
-          <Entry name="ByteCnt"     type="BASE_TYPES/uint16"  shortDescription="Number of bytes of data in the message" /> 
-          <Entry name="Name"        type="MEM_MGR/DwellName" />
+          <Entry name="DataByteLen" type="BASE_TYPES/uint16"  shortDescription="Number of bytes of data in the message" /> 
           <Entry name="Data"        type="MEM_MGR/DwellDataBuf" />
         </EntryList>
       </ContainerDataType>
@@ -548,7 +548,13 @@
             </GenericTypeMapSet>
           </Interface>
 
-          <Interface name="DWELL_TLM" shortDescription="Software bus status telemetry interface" type="CFE_SB/Telemetry">
+          <Interface name="DWELL_1_TLM" shortDescription="Software bus status telemetry interface" type="CFE_SB/Telemetry">
+            <GenericTypeMapSet>
+              <GenericTypeMap name="TelemetryDataType" type="DwellTlm" />
+            </GenericTypeMapSet>
+          </Interface>
+
+          <Interface name="DWELL_2_TLM" shortDescription="Software bus status telemetry interface" type="CFE_SB/Telemetry">
             <GenericTypeMapSet>
               <GenericTypeMap name="TelemetryDataType" type="DwellTlm" />
             </GenericTypeMapSet>
@@ -570,9 +576,9 @@
           <!-- Assign fixed numbers to the "TopicId" parameter of each interface -->
           <ParameterMapSet>          
             <ParameterMap interface="CMD" parameter="TopicId" variableRef="CmdTopicId" />
-            <ParameterMap interface="STATUS_TLM" parameter="TopicId" variableRef="StatusTlmTopicId" />
-            <ParameterMap interface="DWELL_TLM"  parameter="TopicId" variableRef="Dwell1TlmTopicId" />
-            <ParameterMap interface="DWELL_TLM"  parameter="TopicId" variableRef="Dwell2TlmTopicId" />
+            <ParameterMap interface="STATUS_TLM"  parameter="TopicId" variableRef="StatusTlmTopicId" />
+            <ParameterMap interface="DWELL_1_TLM" parameter="TopicId" variableRef="Dwell1TlmTopicId" />
+            <ParameterMap interface="DWELL_2_TLM" parameter="TopicId" variableRef="Dwell2TlmTopicId" />
           </ParameterMapSet>
         </Implementation>
       </Component>

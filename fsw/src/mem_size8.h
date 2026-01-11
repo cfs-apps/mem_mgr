@@ -43,8 +43,8 @@
 
 #define MEM_SIZE8_OPT_INCL_EID      (MEM_SIZE8_BASE_EID + 0)
 #define MEM_SIZE8_FILL_BLOCK_EID    (MEM_SIZE8_BASE_EID + 1)
-#define MEM_SIZE8_PEEK_EID          (MEM_SIZE8_BASE_EID + 2)
-#define MEM_SIZE8_POKE_EID          (MEM_SIZE8_BASE_EID + 3)
+#define MEM_SIZE8_READ_EID          (MEM_SIZE8_BASE_EID + 2)
+#define MEM_SIZE8_WRITE_EID         (MEM_SIZE8_BASE_EID + 3)
 #define MEM_SIZE8_READ_BLOCK_EID    (MEM_SIZE8_BASE_EID + 4)
 #define MEM_SIZE8_WRITE_BLOCK_EID   (MEM_SIZE8_BASE_EID + 5)
 #define MEM_SIZE8_VER_CPU_ADDR_EID  (MEM_SIZE8_BASE_EID + 6)
@@ -63,20 +63,20 @@ bool MEM_SIZE8_FillBlock(uint8 *MemAddr, uint8 FillData, uint32 ByteCnt);
 
 
 /******************************************************************************
-** Function: MEM_SIZE8_Peek
+** Function: MEM_SIZE8_Read
 **
 */
-bool MEM_SIZE8_Peek(uint8 *MemAddr, uint8 *Data);
+bool MEM_SIZE8_Read(uint8 *MemAddr, uint8 *Data);
 
 
 /******************************************************************************
-** Function: MEM_SIZE8_Poke
+** Function: MEM_SIZE8_Write
 **
 ** Notes:
 **   1. Assumes MemType has been verified so no need to report invalid value 
 **
 */
-bool MEM_SIZE8_Poke(uint8 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint8 Data);
+bool MEM_SIZE8_Write(uint8 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint8 Data);
 
 
 /******************************************************************************

@@ -42,6 +42,8 @@
 #define  CMDMGR_OBJ    (&(MemMgr.CmdMgr))
 #define  TBLMGR_OBJ    (&(MemMgr.TblMgr))
 
+#define MEM_DWELL_CTRL_PTR(id) (&(MemMgr.MemDwell.Ctrl[id-1]))
+
 /*******************************/
 /** Local Function Prototypes **/
 /*******************************/
@@ -62,6 +64,16 @@ static void SendStatusTlm(void);
 DEFINE_ENUM(Config,APP_CONFIG)  
 
 
+
+static CFE_EVS_BinFilter_t  EventFilters[] =
+{
+ 
+   /* Event ID                  Mask                  */
+   {MEM_DWELL_EXECUTE_ERR_EID, CFE_EVS_FIRST_8_STOP}
+   
+};
+
+
 /*****************/
 /** Global Data **/
 /*****************/
@@ -78,7 +90,8 @@ void MEM_MGR_AppMain(void)
 
    uint32 RunStatus = CFE_ES_RunStatus_APP_ERROR;
    
-   CFE_EVS_Register(NULL, 0, CFE_EVS_NO_FILTER);
+   CFE_EVS_Register(EventFilters,sizeof(EventFilters)/sizeof(CFE_EVS_BinFilter_t),
+                    CFE_EVS_EventFilter_BINARY);
 
    if (InitApp() == CFE_SUCCESS)      /* Performs initial CFE_ES_PerfLogEntry() call */
    {
@@ -130,6 +143,8 @@ bool MEM_MGR_NoOpCmd(void* ObjDataPtr, const CFE_MSG_Message_t *MsgPtr)
 bool MEM_MGR_ResetAppCmd(void* ObjDataPtr, const CFE_MSG_Message_t *MsgPtr)
 {
 
+   CFE_EVS_ResetAllFilters();
+   
    CMDMGR_ResetStatus(CMDMGR_OBJ);
    TBLMGR_ResetStatus(TBLMGR_OBJ);
    //TODO: CHILDMGR_ResetStatus(CHILDMGR_OBJ);
@@ -265,6 +280,7 @@ static int32 ProcessCommands(void)
          } 
          else if (CFE_SB_MsgId_Equal(MsgId, MemMgr.SendStatusMid))
          {   
+            MEM_DWELL_Execute();  //TODO: Move to own execution message and use a child task
             SendStatusTlm();
          }
          else
@@ -292,7 +308,8 @@ static int32 ProcessCommands(void)
 */
 static void SendStatusTlm(void)
 {
-
+   MEM_MGR_DwellId_Enum_t      DwellId;
+   MEM_DWELL_Ctrl_t            *DwellCtrl;
    MEM_MGR_StatusTlm_Payload_t *Payload = &MemMgr.StatusTlm.Payload;
 
    /*
@@ -310,6 +327,17 @@ static void SendStatusTlm(void)
    Payload->LastMemByteCnt  = MemMgr.Memory.CmdStatus.ByteCnt;
    
    strncpy(Payload->LastMemFilename,MemMgr.MemFile.Filename,OS_MAX_PATH_LEN);
+   
+   for (DwellId = MEM_MGR_DwellId_Enum_t_MIN; DwellId <= MEM_MGR_DwellId_Enum_t_MAX; DwellId++)
+   {
+      DwellCtrl = MEM_DWELL_CTRL_PTR(DwellId);
+      Payload->DwellStatus[DwellId-1].DelayCnt   = DwellCtrl->Tbl.DelayCnts;
+      Payload->DwellStatus[DwellId-1].EntryCnt   = DwellCtrl->Tbl.AddrCnt;
+      Payload->DwellStatus[DwellId-1].ByteCnt    = DwellCtrl->Tbl.DataLen;
+      Payload->DwellStatus[DwellId-1].DataOffset = DwellCtrl->TlmDataOffset;
+      Payload->DwellStatus[DwellId-1].EntryIndex = DwellCtrl->EntryIndex;
+      Payload->DwellStatus[DwellId-1].DelayTimer = DwellCtrl->DelayCntDown;                  
+   } /* End dwell ID loop */ 
    
    CFE_SB_TimeStampMsg(CFE_MSG_PTR(MemMgr.StatusTlm.TelemetryHeader));
    CFE_SB_TransmitMsg(CFE_MSG_PTR(MemMgr.StatusTlm.TelemetryHeader), true);

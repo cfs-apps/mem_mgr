@@ -9,7 +9,7 @@
       "Provides an interface for users to directly access (read/write) memory. This should",
       "only be used by flight software (FSW) development and maintenance engineers. Users",
       "are responsible for not corrupting the FSW image nor damaging hardware through memory",
-      "mapped interfaces. "],
+      "mapped interfaces."],
 
    "cfs": {
       "cfe-type": "CFE_APP",
@@ -21,7 +21,7 @@
       "load_addr": 0,
       "exception-action": 0,
       "app-framework": "osk",
-      "tables": ["mem_mgr_ini.json"]
+      "tables": ["mem_mgr_ini.json","mem_dwell_tbl.json"]
    },
 
    "requires": ["app_c_fw"]

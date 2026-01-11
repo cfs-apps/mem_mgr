@@ -131,14 +131,14 @@ DECLARE_ENUM(Config,APP_CONFIG)
 ** exceeded so it is the developer's responsibility to verify the ranges. 
 */
 
-#define MEM_MGR_BASE_EID       (APP_C_FW_APP_BASE_EID +  0)
-#define MEMORY_BASE_EID        (APP_C_FW_APP_BASE_EID + 20)
-#define MEM_SIZE8_BASE_EID     (APP_C_FW_APP_BASE_EID + 30)
-#define MEM_SIZE16_BASE_EID    (APP_C_FW_APP_BASE_EID + 40)
-#define MEM_SIZE32_BASE_EID    (APP_C_FW_APP_BASE_EID + 50)
-#define MEM_FILE_BASE_EID      (APP_C_FW_APP_BASE_EID + 60)
-#define MEM_DWELL_BASE_EID     (APP_C_FW_APP_BASE_EID + 80)
-#define MEM_DWELL_TBL_BASE_EID (APP_C_FW_APP_BASE_EID + 90)
+#define MEM_MGR_BASE_EID       (APP_C_FW_APP_BASE_EID +   0)
+#define MEMORY_BASE_EID        (APP_C_FW_APP_BASE_EID +  20)
+#define MEM_SIZE8_BASE_EID     (APP_C_FW_APP_BASE_EID +  40)
+#define MEM_SIZE16_BASE_EID    (APP_C_FW_APP_BASE_EID +  50)
+#define MEM_SIZE32_BASE_EID    (APP_C_FW_APP_BASE_EID +  60)
+#define MEM_FILE_BASE_EID      (APP_C_FW_APP_BASE_EID +  70)
+#define MEM_DWELL_BASE_EID     (APP_C_FW_APP_BASE_EID +  90)
+#define MEM_DWELL_TBL_BASE_EID (APP_C_FW_APP_BASE_EID + 110)
 
 /******************************************************************************
 ** Dwell Table Macros

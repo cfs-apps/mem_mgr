@@ -50,22 +50,37 @@
 #define MEM_DWELL_START_CMD_EID       (MEM_DWELL_BASE_EID + 0)
 #define MEM_DWELL_STOP_CMD_EID        (MEM_DWELL_BASE_EID + 0)
 #define MEM_DWELL_LOAD_ENTRY_CMD_EID  (MEM_DWELL_BASE_EID + 0)
+#define MEM_DWELL_EXECUTE_ERR_EID     (MEM_DWELL_BASE_EID + 0)
+
 
 /**********************/
 /** Type Definitions **/
 /**********************/
 
+// TODO: Make length, bytelen, etc consistent
 typedef struct
 {
-   uint16 DelayCnt;
+   uint16 DelayCnts;   // Sum of dwell entry delays
+   uint16 AddrCnt;     // Number of dwell addresses in dwell message
+   uint16 DataLen;     // Sum of dwell entry MemSizes in bytes
    
-} MEM_DWELL_State_t;
+} MEM_DWELL_Ctrl_Tbl_t;
+
+
+typedef struct
+{
+   uint16 DelayCntDown;      // Current execution coundown value 
+   uint16 TlmDataOffset;     // Byte offset for where to write the next data value 
+   uint16 EntryIndex;        // Index of current entry being processed
+   
+   MEM_DWELL_Ctrl_Tbl_t Tbl; // Data derived from table parameters when the table is loaded
+         
+} MEM_DWELL_Ctrl_t;
 
 
 /******************************************************************************
 ** MEM_DWELL_Class
 */
-
 
 typedef struct
 {
@@ -77,10 +92,11 @@ typedef struct
    const INITBL_Class_t *IniTbl;
    
    /*
-   ** MEM_DWELL State Data
+   ** MEM_DWELL MEM State Data
    */
 
-   MEM_DWELL_State_t  State[MEM_MGR_DWELL_ID_CNT];
+   MEM_MGR_DwellTlm_t  Tlm[MEM_MGR_DWELL_ID_CNT];
+   MEM_DWELL_Ctrl_t    Ctrl[MEM_MGR_DWELL_ID_CNT];
    
    /*
    ** Contained Objects
@@ -109,6 +125,13 @@ typedef struct
 void MEM_DWELL_Constructor(MEM_DWELL_Class_t *MemDwellPtr,
                            const INITBL_Class_t *IniTbl,
                            TBLMGR_Class_t *TblMgr);
+
+
+/******************************************************************************
+** Function: MEM_DWELL_Execute
+** 
+*/
+bool MEM_DWELL_Execute(void);
 
 
 /******************************************************************************

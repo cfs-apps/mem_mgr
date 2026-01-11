@@ -9,13 +9,19 @@
                    "after the default table has been loaded, partial entry lists can",
                    "be supplied, however every table must be present.",
                    "Valid non-null entry requirements: ",
-                   " - length: Must be 1, 2, or 4",
-                   " - delay: Any uint16 value. 0 runs every execution cycle",
+                   " - mem-size:",
+                   "    - Must be 1, 2, or 4 which correspond to mem_mgr.xml's",
+                   "      MEM_MGR_MemSize_Enum_t",
+                   " - delay:",
+                   "    - Delay (execution cycles) before next dwell entry is sampled.",
+                   "      The sum of delays determines the telemetry message's output",
+                   "      rate. A common pattern is all zeroes with the last entry having",
+                   "      a non-zero delay. A delay sum of zero doesn't execute.",
                    " - address:",
                    "    - If symbol is an empty string then offseet is the address",
                    "    - Sum of symbol+offset must be a valid acessible address",
-                   "    - If length is 2 then address must be even",
-                   "    - If length is 4 then address must be evenly divisible by 4",
+                   "    - If mem-size is 2 then address must be even",
+                   "    - If mem-size is 4 then address must be evenly divisible by 4",
                    ""],
    
 
@@ -36,10 +42,10 @@
          "topic-id": 2155,
          "enabled": "false",
          "entry": [
-            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  0}},
-            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  4}},
-            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  8}},
-            { "length": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset": 12}}
+            { "mem-size": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  0}},
+            { "mem-size": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  4}},
+            { "mem-size": 4, "delay": 0, "address": {"symbol": "APP_C_FW_Sandbox", "offset":  8}},
+            { "mem-size": 4, "delay": 1, "address": {"symbol": "APP_C_FW_Sandbox", "offset": 12}}
          ]
       },
       {
@@ -49,10 +55,10 @@
          "topic-id": 2156,
          "enabled": "false",
          "entry": [
-            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
-            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
-            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
-            { "length": 0, "delay": 0, "address": {"symbol": "", "offset": 0}}
+            { "mem-size": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
+            { "mem-size": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
+            { "mem-size": 0, "delay": 0, "address": {"symbol": "", "offset": 0}},
+            { "mem-size": 0, "delay": 0, "address": {"symbol": "", "offset": 0}}
          ]
       }
    ]

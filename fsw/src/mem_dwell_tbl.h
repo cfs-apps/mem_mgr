@@ -48,14 +48,15 @@
 ** Event Message IDs
 */
 
-#define MEM_DWELL_TBL_LOAD_EID      (MEM_DWELL_TBL_BASE_EID + 0)
-#define MEM_DWELL_TBL_VALID_EID     (MEM_DWELL_TBL_BASE_EID + 1)
-#define MEM_DWELL_TBL_DUMP_EID      (MEM_DWELL_TBL_BASE_EID + 2)
-
+#define MEM_DWELL_TBL_LOAD_EID        (MEM_DWELL_TBL_BASE_EID + 0)
+#define MEM_DWELL_TBL_VALID_EID       (MEM_DWELL_TBL_BASE_EID + 1)
+#define MEM_DWELL_TBL_DUMP_EID        (MEM_DWELL_TBL_BASE_EID + 2)
+#define MEM_DWELL_TBL_LOAD_ENTRY_EID  (MEM_DWELL_TBL_BASE_EID + 3) //TODO: Need?
 
 /**********************/
 /** Type Definitions **/
 /**********************/
+
 
 /******************************************************************************
 ** Message Table -  Local table copy used for table loads
@@ -65,9 +66,10 @@
 typedef struct
 {
    
-   uint16  Length;
    uint16  Delay;
-   MEM_MGR_SymbolAddr_t SymbolAddr;
+   MEM_MGR_SymbolAddr_t    SymbolAddr;
+   MEM_MGR_MemSize_Enum_t  MemSize;
+   MEMORY_VerifiedMemory_t VerifiedMemory;  // Address derived/validated from Symbol Address + Offset
 
 } MEM_DWELL_TBL_Dwell_Entry_t;
 
@@ -83,6 +85,10 @@ typedef struct
 
 } MEM_DWELL_TBL_Dwell_t;
 
+/*
+** Table load callback function
+*/
+typedef bool (*MEM_DWELL_TBL_OwnerAcceptFunc_t)(const MEM_DWELL_TBL_Dwell_t DwellTbl[MEM_MGR_DWELL_ID_CNT]);
 
 typedef struct
 {
@@ -91,8 +97,8 @@ typedef struct
    ** Table parameter data
    */
    
-   MEM_DWELL_TBL_Dwell_t Dwell[MEM_MGR_DWELL_ID_CNT];
-
+   MEM_DWELL_TBL_Dwell_t            Dwell[MEM_MGR_DWELL_ID_CNT];
+   MEM_DWELL_TBL_OwnerAcceptFunc_t  OwnerAcceptFunc;
 
    /*
    ** Standard CJSON table data
@@ -122,7 +128,8 @@ typedef struct
 **   2. The local table data is not populated. This is done when the table is 
 **      registered with the app framework table manager.
 */
-void MEM_DWELL_TBL_Constructor(MEM_DWELL_TBL_Class_t *ObjPtr);
+void MEM_DWELL_TBL_Constructor(MEM_DWELL_TBL_Class_t *ObjPtr,
+                               MEM_DWELL_TBL_OwnerAcceptFunc_t OwnerAcceptFunc);
 
 
 /******************************************************************************
@@ -135,6 +142,16 @@ void MEM_DWELL_TBL_Constructor(MEM_DWELL_TBL_Class_t *ObjPtr);
 **
 */
 bool MEM_DWELL_TBL_DumpCmd(osal_id_t FileHandle);
+
+
+/******************************************************************************
+** Function: MEM_DWELL_TBL_EntryMemSizeEnabled
+**
+** Notes:
+**   1. Use MemSize to determine whether an entry is enabled.
+** 
+*/
+bool MEM_DWELL_TBL_EntryMemSizeEnabled(const MEM_DWELL_TBL_Dwell_Entry_t *Entry);
 
 
 /******************************************************************************
@@ -159,6 +176,18 @@ MEM_DWELL_TBL_Dwell_t *MEM_DWELL_TBL_GetDwellPtr(MEM_MGR_DwellId_Enum_t DwellId)
 */
 bool MEM_DWELL_TBL_LoadCmd(APP_C_FW_TblLoadOptions_Enum_t LoadType, const char *Filename);
 
+
+/******************************************************************************
+** Function: MEM_DWELL_TBL_LoadEntry
+**
+** Notes:
+**  1. Validates and loads a dwell entry
+**
+*/
+bool MEM_DWELL_TBL_LoadEntry(MEM_DWELL_TBL_Dwell_Entry_t *Entry,
+                             uint16 Delay,
+                             MEM_MGR_MemSize_Enum_t MemSize,
+                             MEM_MGR_SymbolAddr_t SymbolAddr);
 
 /******************************************************************************
 ** Function: MEM_DWELL_TBL_ResetStatus

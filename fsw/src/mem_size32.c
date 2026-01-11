@@ -76,10 +76,10 @@ bool MEM_SIZE32_FillBlock(uint32 *MemAddr, uint32 FillData, uint32 ByteCnt)
 
 
 /******************************************************************************
-** Function: MEM_SIZE32_Peek
+** Function: MEM_SIZE32_Read
 **
 */
-bool MEM_SIZE32_Peek(uint32 *MemAddr, uint32 *Data)
+bool MEM_SIZE32_Read(uint32 *MemAddr, uint32 *Data)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE32
    
@@ -94,8 +94,8 @@ bool MEM_SIZE32_Peek(uint32 *MemAddr, uint32 *Data)
    else
    {
       *Data = 0; 
-      CFE_EVS_SendEvent(MEM_SIZE32_PEEK_EID, CFE_EVS_EventType_ERROR,
-                        "32-bit memory peek(read) failed for address %p, status=0x%08X",
+      CFE_EVS_SendEvent(MEM_SIZE32_READ_EID, CFE_EVS_EventType_ERROR,
+                        "32-bit memory read failed for address %p, status=0x%08X",
                         (void *)MemAddr, (unsigned int)PspStatus);
    }
 
@@ -104,17 +104,17 @@ bool MEM_SIZE32_Peek(uint32 *MemAddr, uint32 *Data)
    CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
    return false;
 #endif
-} /* End MEM_SIZE32_Peek() */
+} /* End MEM_SIZE32_Read() */
 
 
 /******************************************************************************
-** Function: MEM_SIZE32_Poke
+** Function: MEM_SIZE32_Write
 **
 ** Notes:
 **   1. Assumes MemType has been verified so no need to report invalid value 
 **
 */
-bool MEM_SIZE32_Poke(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint32 Data)
+bool MEM_SIZE32_Write(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint32 Data)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE32
    
@@ -139,8 +139,8 @@ bool MEM_SIZE32_Poke(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char
    }
    else
    {
-      CFE_EVS_SendEvent(MEM_SIZE32_POKE_EID, CFE_EVS_EventType_ERROR,
-                        "32-bit %s memory poke(write) failed for address %p, status=0x%08X",
+      CFE_EVS_SendEvent(MEM_SIZE32_WRITE_EID, CFE_EVS_EventType_ERROR,
+                        "32-bit %s memory write failed for address %p, status=0x%08X",
                         MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
    }
 
@@ -149,7 +149,7 @@ bool MEM_SIZE32_Poke(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char
    CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
    return false;
 #endif
-} /* End MEM_SIZE32_Poke() */
+} /* End MEM_SIZE32_Write() */
 
 
 /******************************************************************************
