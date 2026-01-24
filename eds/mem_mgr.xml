@@ -67,8 +67,8 @@
       <EnumeratedDataType name="DwellId" shortDescription="User name interface is 1..DWELL_TLM_MSG_CNT" >
         <IntegerDataEncoding sizeInBits="16" encoding="unsigned" />
         <EnumerationList>
-          <Enumeration label="_1"   value="1"  shortDescription="" />
-          <Enumeration label="_2"   value="2"  shortDescription="" />
+          <Enumeration label="1"   value="1"  shortDescription="" />
+          <Enumeration label="2"   value="2"  shortDescription="" />
         </EnumerationList>
       </EnumeratedDataType>
       
@@ -91,6 +91,7 @@
       <!--**** DataTypeSet:  Entry Types ****-->
       <!--***********************************-->
 
+      <!-- If this definition changes then memory.c's MEMORY_TypeStr() must change -->
       <EnumeratedDataType name="MemType" shortDescription="Define memory types. TODO: Check if cFS has definitions" >
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned" />
         <EnumerationList>
@@ -100,6 +101,7 @@
         </EnumerationList>
       </EnumeratedDataType>
 
+      <!-- If this definition changes then memory.c's MEMORY_MemSizeStr() must change -->
       <EnumeratedDataType name="MemSize" shortDescription="Names describes bit size and value defines number of bytes, except for UNDEF and VOID" >
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned" />
         <EnumerationList>

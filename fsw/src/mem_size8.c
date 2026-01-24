@@ -19,7 +19,6 @@
 **    1. From an OO design perspective this is a child class of MEMORY.
 **    2. All functions operates on 8-bit data values and it is up 
 **       to the caller to perform casting if needed.
-
 **
 */
 
@@ -108,53 +107,6 @@ bool MEM_SIZE8_Read(uint8 *MemAddr, uint8 *Data)
 
 
 /******************************************************************************
-** Function: MEM_SIZE8_Write
-**
-** Notes:
-**   1. Assumes MemType has been verified so no need to report invalid value 
-**
-*/
-bool MEM_SIZE8_Write(uint8 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint8 Data)
-{
-#if defined MEM_MGR_OPT_INCL_MEM_SIZE8
- 
-   bool   RetStatus = false;
-
-   int32  PspStatus;
-
-   switch (MemType)
-   {
-      case MEM_MGR_MemType_NONVOL:
-         PspStatus = CFE_PSP_EepromWrite8((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
-         break;
-      case MEM_MGR_MemType_RAM:
-         PspStatus = CFE_PSP_MemWrite8((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
-         break;
-      default:
-         break;
-   } /* End mem type switch */
-
-   if (PspStatus == CFE_PSP_SUCCESS)
-   {
-      RetStatus = true;
-   }
-   else
-   {
-      CFE_EVS_SendEvent(MEM_SIZE8_WRITE_EID, CFE_EVS_EventType_ERROR,
-                        "8-bit %s memory write failed for address %p, status=0x%08X",
-                        MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
-   }
-   
-   return RetStatus;
-
-#else
-   CFE_EVS_SendEvent(MEM_SIZE8_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
-   return false;
-#endif
-} /* End MEM_SIZE8_Write() */
-
-
-/******************************************************************************
 ** Function: MEM_SIZE8_ReadBlock
 **
 */
@@ -220,6 +172,53 @@ bool MEM_SIZE8_VerifyCpuAddr(uint8 *MemAddr, uint32 PspMemType, const char *MemT
    return false;
 #endif
 } /* End MEM_SIZE8_VerifyCpuAddr() */
+
+
+/******************************************************************************
+** Function: MEM_SIZE8_Write
+**
+** Notes:
+**   1. Assumes MemType has been verified so no need to report invalid value 
+**
+*/
+bool MEM_SIZE8_Write(uint8 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint8 Data)
+{
+#if defined MEM_MGR_OPT_INCL_MEM_SIZE8
+ 
+   bool   RetStatus = false;
+
+   int32  PspStatus;
+
+   switch (MemType)
+   {
+      case MEM_MGR_MemType_NONVOL:
+         PspStatus = CFE_PSP_EepromWrite8((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
+         break;
+      case MEM_MGR_MemType_RAM:
+         PspStatus = CFE_PSP_MemWrite8((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
+         break;
+      default:
+         break;
+   } /* End mem type switch */
+
+   if (PspStatus == CFE_PSP_SUCCESS)
+   {
+      RetStatus = true;
+   }
+   else
+   {
+      CFE_EVS_SendEvent(MEM_SIZE8_WRITE_EID, CFE_EVS_EventType_ERROR,
+                        "8-bit %s memory write failed for address %p, status=0x%08X",
+                        MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
+   }
+   
+   return RetStatus;
+
+#else
+   CFE_EVS_SendEvent(MEM_SIZE8_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
+   return false;
+#endif
+} /* End MEM_SIZE8_Write() */
 
 
 /******************************************************************************

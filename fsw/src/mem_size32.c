@@ -60,7 +60,7 @@ bool MEM_SIZE32_FillBlock(uint32 *MemAddr, uint32 FillData, uint32 ByteCnt)
       else
       {
          RetStatus = false;
-         CFE_EVS_SendEvent(MEM_SIZE32_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
+         CFE_EVS_SendEvent(MEM_SIZE32_FILL_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "32-bit memory fill block failed at destination address %p, byte count %d, status=0x%08X",
                            (void *)MemAddr, i, (unsigned int)PspStatus);
          break; 
@@ -105,6 +105,85 @@ bool MEM_SIZE32_Read(uint32 *MemAddr, uint32 *Data)
    return false;
 #endif
 } /* End MEM_SIZE32_Read() */
+
+
+/******************************************************************************
+** Function: MEM_SIZE32_ReadBlock
+**
+*/
+bool MEM_SIZE32_ReadBlock(const uint32 *MemAddr, uint32* DestAddr, uint32 ByteCnt)
+{
+#if defined MEM_MGR_OPT_INCL_MEM_SIZE32
+
+   bool   RetStatus = true;
+   int32  PspStatus;
+   uint32 i;
+
+   for (i = 0; i < ByteCnt; i++)
+   {
+      PspStatus = CFE_PSP_MemRead32((MEM_MGR_CpuAddr_Atom_t)MemAddr, DestAddr);
+      if (PspStatus == CFE_PSP_SUCCESS)
+      {
+         MemAddr++;
+         DestAddr++;
+      }
+      else
+      {
+         RetStatus = false;
+         CFE_EVS_SendEvent(MEM_SIZE32_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
+                           "32-bit memory block read failed at source address %p, destination address %p, byte count %d, status=0x%08X",
+                           (void *)MemAddr, (void *)DestAddr, i, (unsigned int)PspStatus);
+         break; 
+      }
+   } /* End loop */
+
+   return RetStatus;
+#else
+   CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
+   return false;
+#endif
+} /* End MEM_SIZE32_ReadBlock() */
+
+
+/******************************************************************************
+** Function: MEM_SIZE32_VerifyCpuAddr
+**
+*/
+bool MEM_SIZE32_VerifyCpuAddr(uint32 *MemAddr, uint32 PspMemType, const char* MemTypeStr, uint32 ByteCnt)
+{
+#if defined MEM_MGR_OPT_INCL_MEM_SIZE32
+
+   bool  RetStatus = false;
+   int32 PspStatus;
+
+   if ((long unsigned int)MemAddr % sizeof(uint32) == 0)
+   {
+      PspStatus = CFE_PSP_MemValidateRange((MEM_MGR_CpuAddr_Atom_t)MemAddr, ByteCnt, PspMemType);
+      if (PspStatus == CFE_PSP_SUCCESS)
+      {
+         RetStatus = true;
+      }
+      else
+      {
+         CFE_EVS_SendEvent(MEM_SIZE32_VER_CPU_ADDR_EID, CFE_EVS_EventType_ERROR,
+                           "32-bit %s memory address %p failed PSP validation, status=0x%08X",
+                           MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
+      }
+      
+   } /* End if valid alignment */
+   else
+   {
+      CFE_EVS_SendEvent(MEM_SIZE32_VER_CPU_ADDR_EID, CFE_EVS_EventType_ERROR,
+                        "32-bit %s memory address %p not 32 bit aligned",
+                        MemTypeStr, (void *)MemAddr);
+   }
+   
+   return RetStatus;
+#else
+   CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
+   return false;
+#endif
+} /* End MEM_SIZE32_VerifyCpuAddr() */
 
 
 /******************************************************************************
@@ -153,86 +232,6 @@ bool MEM_SIZE32_Write(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const cha
 
 
 /******************************************************************************
-** Function: MEM_SIZE32_ReadBlock
-**
-*/
-bool MEM_SIZE32_ReadBlock(const uint32 *MemAddr, uint32* DestAddr, uint32 ByteCnt)
-{
-#if defined MEM_MGR_OPT_INCL_MEM_SIZE32
-
-   bool   RetStatus = true;
-   int32  PspStatus;
-   uint32 i;
-
-   for (i = 0; i < ByteCnt; i++)
-   {
-      PspStatus = CFE_PSP_MemRead32((MEM_MGR_CpuAddr_Atom_t)MemAddr, DestAddr);
-      if (PspStatus == CFE_PSP_SUCCESS)
-      {
-         MemAddr++;
-         DestAddr++;
-      }
-      else
-      {
-         RetStatus = false;
-         CFE_EVS_SendEvent(MEM_SIZE32_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
-                           "32-bit memory block read failed at source address %p, destination address %p, byte count %d, status=0x%08X",
-                           (void *)MemAddr, (void *)DestAddr, i, (unsigned int)PspStatus);
-         break; 
-      }
-   } /* End loop */
-
-   return RetStatus;
-#else
-   CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
-   return false;
-#endif
-} /* End MEM_SIZE32_ReadBlock() */
-
-
-
-/******************************************************************************
-** Function: MEM_SIZE32_VerifyCpuAddr
-**
-*/
-bool MEM_SIZE32_VerifyCpuAddr(uint32 *MemAddr, uint32 PspMemType, const char* MemTypeStr, uint32 ByteCnt)
-{
-#if defined MEM_MGR_OPT_INCL_MEM_SIZE32
-
-   bool  RetStatus = false;
-   int32 PspStatus;
-
-   if ((long unsigned int)MemAddr % sizeof(uint32) == 0)
-   {
-      PspStatus = CFE_PSP_MemValidateRange((MEM_MGR_CpuAddr_Atom_t)MemAddr, ByteCnt, PspMemType);
-      if (PspStatus == CFE_PSP_SUCCESS)
-      {
-         RetStatus = true;
-      }
-      else
-      {
-         CFE_EVS_SendEvent(MEM_SIZE32_VER_CPU_ADDR_EID, CFE_EVS_EventType_ERROR,
-                           "32-bit %s memory address %p failed PSP validation, status=0x%08X",
-                           MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
-      }
-      
-   } /* End if valid alignment */
-   else
-   {
-      CFE_EVS_SendEvent(MEM_SIZE32_VER_CPU_ADDR_EID, CFE_EVS_EventType_ERROR,
-                        "32-bit %s memory address %p not 32 bit aligned",
-                        MemTypeStr, (void *)MemAddr);
-   }
-   
-   return RetStatus;
-#else
-   CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
-   return false;
-#endif
-} /* End MEM_SIZE32_VerifyCpuAddr() */
-
-
-/******************************************************************************
 ** Function: MEM_SIZE32_WriteBlock
 **
 */
@@ -255,7 +254,7 @@ bool MEM_SIZE32_WriteBlock(uint32 *MemAddr, const uint32 *SrcAddr, uint32 ByteCn
       else
       {
          RetStatus = false;
-         CFE_EVS_SendEvent(MEM_SIZE32_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
+         CFE_EVS_SendEvent(MEM_SIZE32_WRITE_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "32-bit memory block write failed at source address %p, destination address %p, byte count %d, status=0x%08X",
                            (void *)SrcAddr, (void *)MemAddr, i, (unsigned int)PspStatus);
          break; 

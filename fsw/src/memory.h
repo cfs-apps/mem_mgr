@@ -51,8 +51,9 @@
 #define MEMORY_WRITE_EID             (MEMORY_BASE_EID +  9)
 #define MEMORY_CREATE_CPU_ADDR_EID   (MEMORY_BASE_EID + 10)
 #define MEMORY_GET_PSP_MEM_TYPE_EID  (MEMORY_BASE_EID + 11)
-#define MEMORY_VER_CPU_ADDR_EID      (MEMORY_BASE_EID + 12)
-
+#define MEMORY_VERIFY_CPU_ADDR_EID   (MEMORY_BASE_EID + 12)
+#define MEMORY_FILL_MEM_BLOCK_EID    (MEMORY_BASE_EID + 13)
+#define MEMORY_READ_MEM_BLOCK_EID    (MEMORY_BASE_EID + 14)
 
 /**********************/
 /** Type Definitions **/
@@ -86,7 +87,9 @@ typedef struct
     
 typedef struct
 {
-   bool EepromWriteEna;
+   
+   bool   EepromWriteEna;
+   uint32 DumpToEventBuf[MEMORY_DUMP_TOEVENT_MAX_DWORDS];  // Defined to support 32-bit memory dumps
    
    MEMORY_CmdStatus_t CmdStatus;
       
@@ -185,9 +188,6 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
 /******************************************************************************
 ** Function: MEMORY_Read
 **
-** Notes:
-**   None
-**
 */
 uint8 MEMORY_Read(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemSize_Enum_t MemSize,
                   uint32 *Data);
@@ -206,8 +206,7 @@ void MEMORY_ResetStatus(void);
 ** Notes:
 **   1. This is used by objects that a 'uses a' MEMORY object relationship.
 **      They use memory child objects to perform memory operations for commands
-**      and then call this function to update the MEMORY command status. This
-**      approach overdesigning an elaborate and complicated OO design in C.  
+**      and then call this function to update the MEMORY command status.
 **
 */
 void MEMORY_SetCmdStatus(const MEMORY_CmdStatus_t *CmdStatus);
@@ -239,9 +238,6 @@ bool MEMORY_VerifyAddr(MEM_MGR_SymbolAddr_t SymbolAddr, MEM_MGR_MemType_Enum_t M
 
 /******************************************************************************
 ** Function: MEMORY_Write
-**
-** Notes:
-**   None
 **
 */
 uint8 MEMORY_Write(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemType_Enum_t MemType, 

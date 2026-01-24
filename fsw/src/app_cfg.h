@@ -160,11 +160,11 @@ DECLARE_ENUM(Config,APP_CONFIG)
 #define MEMORY_DUMP_TOEVENT_TRAILER_STR  "from address: %p"
 #define MEMORY_DUMP_TOEVENT_MAX_BYTES    ((CFE_MISSION_EVS_MAX_MESSAGE_LENGTH - (13 + 33)) / 5)
 
-    /*
-    ** Allocate a dump buffer. It's declared this way to ensure it stays
-    ** longword aligned since MM_MAX_DUMP_INEVENT_BYTES can be adjusted
-    ** by changing the maximum event message string size.
-    */
+ /*
+ ** Allocate a dump buffer. It's declared this way to ensure it stays
+ ** longword aligned since MM_MAX_DUMP_INEVENT_BYTES can be adjusted
+ ** by changing the maximum event message string size.
+ */
 
 #define MEMORY_DUMP_TOEVENT_MAX_DWORDS   ((MEMORY_DUMP_TOEVENT_MAX_BYTES+3)/4)
   

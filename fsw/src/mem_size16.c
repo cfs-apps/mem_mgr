@@ -58,7 +58,7 @@ bool MEM_SIZE16_FillBlock(uint16 *MemAddr, uint16 FillData, uint32 ByteCnt)
       else
       {
          RetStatus = false;
-         CFE_EVS_SendEvent(MEM_SIZE16_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
+         CFE_EVS_SendEvent(MEM_SIZE16_FILL_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "16-bit memory fill block failed at destination address %p, byte count %d, status=0x%08X",
                            (void *)MemAddr, i, (unsigned int)PspStatus);
          break; 
@@ -103,51 +103,6 @@ bool MEM_SIZE16_Read(uint16 *MemAddr, uint16 *Data)
    return false;
 #endif
 } /* End MEM_SIZE16_Read() */
-
-
-/******************************************************************************
-** Function: MEM_SIZE16_Write
-**
-** Notes:
-**   1. Assumes MemType has been verified so no need to report invalid value 
-**
-*/
-bool MEM_SIZE16_Write(uint16 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint16 Data)
-{
-#if defined MEM_MGR_OPT_INCL_MEM_SIZE16
-   
-   bool   RetStatus = false;
-   int32  PspStatus;
-
-   switch (MemType)
-   {
-      case MEM_MGR_MemType_NONVOL:
-         PspStatus = CFE_PSP_EepromWrite16((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
-         break;
-      case MEM_MGR_MemType_RAM:
-         PspStatus = CFE_PSP_MemWrite16((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
-         break;
-      default:
-         break;
-   } /* End mem type switch */
-
-   if (PspStatus == CFE_PSP_SUCCESS)
-   {
-      RetStatus = true;
-   }
-   else
-   {
-      CFE_EVS_SendEvent(MEM_SIZE16_WRITE_EID, CFE_EVS_EventType_ERROR,
-                        "16-bit %s memory write failed for address %p, status=0x%08X",
-                        MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
-   }
-
-   return RetStatus;
-#else
-   CFE_EVS_SendEvent(MEM_SIZE16_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
-   return false;
-#endif
-} /* End MEM_SIZE16_Write() */
 
 
 /******************************************************************************
@@ -227,6 +182,51 @@ bool MEM_SIZE16_VerifyCpuAddr(uint16 *MemAddr, uint32 PspMemType, const char *Me
    return false;
 #endif
 } /* End MEM_SIZE16_VerifyCpuAddr() */
+
+
+/******************************************************************************
+** Function: MEM_SIZE16_Write
+**
+** Notes:
+**   1. Assumes MemType has been verified so no need to report invalid value 
+**
+*/
+bool MEM_SIZE16_Write(uint16 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint16 Data)
+{
+#if defined MEM_MGR_OPT_INCL_MEM_SIZE16
+   
+   bool   RetStatus = false;
+   int32  PspStatus;
+
+   switch (MemType)
+   {
+      case MEM_MGR_MemType_NONVOL:
+         PspStatus = CFE_PSP_EepromWrite16((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
+         break;
+      case MEM_MGR_MemType_RAM:
+         PspStatus = CFE_PSP_MemWrite16((MEM_MGR_CpuAddr_Atom_t)MemAddr, Data);
+         break;
+      default:
+         break;
+   } /* End mem type switch */
+
+   if (PspStatus == CFE_PSP_SUCCESS)
+   {
+      RetStatus = true;
+   }
+   else
+   {
+      CFE_EVS_SendEvent(MEM_SIZE16_WRITE_EID, CFE_EVS_EventType_ERROR,
+                        "16-bit %s memory write failed for address %p, status=0x%08X",
+                        MemTypeStr, (void *)MemAddr, (unsigned int)PspStatus);
+   }
+
+   return RetStatus;
+#else
+   CFE_EVS_SendEvent(MEM_SIZE16_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
+   return false;
+#endif
+} /* End MEM_SIZE16_Write() */
 
 
 /******************************************************************************

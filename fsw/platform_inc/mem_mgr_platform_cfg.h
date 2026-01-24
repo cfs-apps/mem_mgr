@@ -13,7 +13,7 @@
 **  GNU Affero General Public License for more details.
 **
 **  Purpose:
-**    Define platform configurations for the MEM_MGR application
+**    Define platform configurations for the Memory Manager application
 **
 **  Notes:
 **   1. Compile-time configurations that are applied to each platform

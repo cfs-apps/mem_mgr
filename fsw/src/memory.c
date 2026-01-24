@@ -22,7 +22,7 @@
 **       functions. The conditional compilation switches are located in 
 **       these functions and event messages report errors.
 **    2. Parameter order convention is Address, Type, Size, Data
-**    TODO: Review command function consustency with sucess/fail events and HK tlm
+**    TODO: Review command function consistency with sucess/fail events and HK tlm
 **
 */
 
@@ -56,15 +56,24 @@ static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType, con
 static MEMORY_Class_t *Memory = NULL;
 
 // MEM_MGR_MemType_Enum_t
-static const char *MemTypeStr[] = {
-   "UNDEF",   // MEM_MGR_MemType_UNDEF
-   "RAM",     // MEM_MGR_MemType_RAM
-   "NONVOL"   // MEM_MGR_MemType_NONVOL
+static const char *MemTypeStr[] =
+{
+   "UNDEF",   // 0 = MEM_MGR_MemType_UNDEF
+   "RAM",     // 1 = MEM_MGR_MemType_RAM
+   "NONVOL",  // 2 = MEM_MGR_MemType_NONVOL
+   "INVALID"  // 3 = Outisde enumeration range
 };
 
-//TODO: Decide how/where to define DumpToEventBuf[]
-static uint32 DumpToEventBuf[MEMORY_DUMP_TOEVENT_MAX_DWORDS];  // Defined to support 32-bit memory dumps
-
+// MEM_MGR_MemSize_Enum_t
+static const char *MemSizeStr[] =
+{
+   "UNDEF",   // 0 = MEM_MGR_MemSize_UNDEF
+   "8",       // 1 = MEM_MGR_MemType_8
+   "16",      // 2 = MEM_MGR_MemType_16
+   "INVALID", // 3 = Unused
+   "32",      // 4 = MEM_MGR_MemType_32
+   "VOID"     // 5 = MEM_MGR_MemType_VOID
+};
 
 /******************************************************************************
 ** Function: MEMORY_Constructor
@@ -145,12 +154,12 @@ bool MEMORY_DumpToEventCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
    if (RetStatus == true)
    {
          
-      RetStatus = ReadMemBlock(DumpToEventBuf, VerifiedMemory.CpuAddr,  
+      RetStatus = ReadMemBlock(Memory->DumpToEventBuf, VerifiedMemory.CpuAddr,  
                                DumpToEventCmd->MemSize, DumpToEventCmd->ByteCnt);
 
       if (RetStatus == true)
       {
-         RetStatus = SendDumpBufToEvent(VerifiedMemory.CpuAddr, (const uint8*)DumpToEventBuf, DumpToEventCmd->ByteCnt);
+         RetStatus = SendDumpBufToEvent(VerifiedMemory.CpuAddr, (const uint8*)Memory->DumpToEventBuf, DumpToEventCmd->ByteCnt);
       }
       
    } /* End MEMORY_VerifyAddr()*/
@@ -164,7 +173,12 @@ bool MEMORY_DumpToEventCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       Memory->CmdStatus.Data     = 0;  // TODO: Capture last data byte?
       Memory->CmdStatus.ByteCnt  = DumpToEventCmd->ByteCnt;
    }
-      
+   else
+   {
+      CFE_EVS_SendEvent(MEMORY_DUMP_TO_EVENT_EID, CFE_EVS_EventType_ERROR,
+                        "Dump memory to an event message command failed. See accompanying event for details");
+   }
+   
    return RetStatus;
    
 } /* End MEMORY_DumpToEventCmd() */
@@ -240,6 +254,11 @@ bool MEMORY_FillCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
                            (int)FillCmd->ByteCnt, FillCmd->Data, (void *)VerifiedMemory.CpuAddr);
 
       }
+      else
+      {
+         CFE_EVS_SendEvent(MEMORY_FILL_CMD_EID, CFE_EVS_EventType_ERROR,
+                           "Fill memory command failed. See accompanying event for details");
+      }      
       
    } /* End MEMORY_VerifyAddr()*/
    
@@ -289,7 +308,7 @@ bool MEMORY_LoadWithIntDisCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
             Memory->CmdStatus.ByteCnt  = LoadWithIntDisCmd->ByteCnt;
 
             CFE_EVS_SendEvent(MEMORY_LOAD_INT_DIS_EID, CFE_EVS_EventType_INFORMATION,
-                              "Load memory with interrupts disabled: Wrote %d bytes to address: %p", 
+                              "Load memory with interrupts disabled complete: Wrote %d bytes to address: %p", 
                               (int)LoadWithIntDisCmd->ByteCnt, (void *)VerifiedMemory.CpuAddr);
 
          }
@@ -309,6 +328,11 @@ bool MEMORY_LoadWithIntDisCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 
       } /* End invalid CRC */      
    } /* End MEMORY_VerifyAddr()*/
+   else
+   {
+      CFE_EVS_SendEvent(MEMORY_LOAD_INT_DIS_EID, CFE_EVS_EventType_ERROR,
+                        "Load memory with interrupts command failed. See accompanying event for details");
+   }
  
    return RetStatus;
    
@@ -348,7 +372,7 @@ OS_printf("Cmd Symbol: %s, Local Symbol: %s\n",LookupSymbolCmd->Name,SymbolName)
       {
          RetStatus = true;
          CFE_EVS_SendEvent(MEMORY_LOOKUP_SYMBOL_EID, CFE_EVS_EventType_INFORMATION,
-                           "Lookup symbol command: Name='%s' Addr=%p", SymbolName, (void *)ResolvedAddr);
+                           "Lookup symbol command complete: Name='%s' Addr=%p", SymbolName, (void *)ResolvedAddr);
       }
       else
       {
@@ -380,7 +404,7 @@ bool MEMORY_PeekCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
    const MEM_MGR_Peek_CmdPayload_t *PeekCmd = CMDMGR_PAYLOAD_PTR(MsgPtr, MEM_MGR_Peek_t);
  
    bool   RetStatus = false;
-   uint32 Data;
+   uint32 Data=0;
    uint8  ByteCnt;
    MEMORY_VerifiedMemory_t VerifiedMemory;
 
@@ -401,17 +425,22 @@ bool MEMORY_PeekCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
          Memory->CmdStatus.ByteCnt  = ByteCnt;      
 
          CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_INFORMATION,
-                           "Peek %s Cmd: Addr=%p, Bytes=%u, Data=0x%08X",
+                           "Peek %s memory command complete: Addr=%p, Bytes=%u, Data=0x%08X",
                            VerifiedMemory.TypeStr, (void*)VerifiedMemory.CpuAddr,
                            ByteCnt, Data);
       }
       else
       {
          CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_ERROR,
-                           "Memory Manager Peek command failed for address %p",
+                           "Peek memory command failed for address %p",
                            (void*)VerifiedMemory.CpuAddr);   
       }
    } /* End if valid address */
+   else
+   {
+      CFE_EVS_SendEvent(MEMORY_PEEK_CMD_EID, CFE_EVS_EventType_ERROR,
+                        "Peek memory command failed. See accompanying event for details");
+   }
    
    return RetStatus;
     
@@ -453,7 +482,7 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
          Memory->CmdStatus.ByteCnt   = ByteCnt;      
 
          CFE_EVS_SendEvent(MEMORY_POKE_CMD_EID, CFE_EVS_EventType_INFORMATION,
-                           "Poke %s Cmd: Addr=%p, Bytes=%u, Data=0x%08X",
+                           "Poke %s memory command complete: Addr=%p, Bytes=%u, Data=0x%08X",
                            VerifiedMemory.TypeStr, (void*)VerifiedMemory.CpuAddr,
                            ByteCnt, PokeCmd->Data);
       }
@@ -461,10 +490,15 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       {   
 
          CFE_EVS_SendEvent(MEMORY_POKE_CMD_EID, CFE_EVS_EventType_ERROR,
-                           "Memory Manager Poke command failed for address %p",
+                           "Poke memory command failed for address %p",
                            (void*)VerifiedMemory.CpuAddr);     
       }
    } /* End if valid address */
+   else
+   {
+      CFE_EVS_SendEvent(MEMORY_POKE_CMD_EID, CFE_EVS_EventType_ERROR,
+                        "Poke memory command failed. See accompanying event for details");
+   }
    
    return RetStatus;
     
@@ -477,7 +511,8 @@ bool MEMORY_PokeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 ** Notes:
 **   1. After all command validation is performed, this function is called to
 **      do the memory read.
-**   2. From an OO design perspective this is a virtual read function dispatcher
+**   2. From an OO design perspective this is a virtual function dispatcher
+**      for memory types.
 **
 */
 uint8 MEMORY_Read(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemSize_Enum_t MemSize,
@@ -539,8 +574,7 @@ void MEMORY_ResetStatus(void)
 ** Notes:
 **   1. This is used by objects that a 'uses a' MEMORY object relationship.
 **      They use memory child objects to perform memory operations for commands
-**      and then call this function to update the MEMORY command status. This
-**      approach overdesigning an elaborate and complicated OO design in C.  
+**      and then call this function to update the MEMORY command status.
 **
 */
 void MEMORY_SetCmdStatus(const MEMORY_CmdStatus_t *CmdStatus)
@@ -549,6 +583,28 @@ void MEMORY_SetCmdStatus(const MEMORY_CmdStatus_t *CmdStatus)
    memcpy(&Memory->CmdStatus, CmdStatus, sizeof(MEMORY_CmdStatus_t));
    
 } /* MEMORY_SetCmdStatus() */
+
+
+/******************************************************************************
+** Function: MEMORY_SizeStr
+**
+** Notes:
+**   1. Returns a pointer to a string for each enumeration in 
+**      MEM_MGR_MemSize_Enum_t.
+**   2. Enumeration names describes bit size and the enumeration value defines
+**      number of bytes, except for UNDEF and VOID
+**
+*/
+const char *MEMORY_SizeStr(MEM_MGR_MemSize_Enum_t MemSize)
+{
+   uint8 i = 3; // Unused enumeration value that is used to report invalid definitions
+   
+   if (MemSize >= MEM_MGR_MemSize_Enum_t_MIN && MemSize <= MEM_MGR_MemSize_Enum_t_MAX)
+      i = MemSize;
+   
+   return MemSizeStr[i];
+   
+} /* MEMORY_SizeStr() */
 
 
 /******************************************************************************
@@ -577,6 +633,8 @@ const char *MEMORY_TypeStr(MEM_MGR_MemType_Enum_t MemType)
 ** Notes:
 **   1. This is the top-level address verification function that is called by
 **      command functions.
+**   1. Callers assume this functions sends error events and this function
+**      assumes the functions called send error events.
 **
 */
 bool MEMORY_VerifyAddr(MEM_MGR_SymbolAddr_t SymbolAddr, MEM_MGR_MemType_Enum_t MemType,
@@ -619,7 +677,8 @@ bool MEMORY_VerifyAddr(MEM_MGR_SymbolAddr_t SymbolAddr, MEM_MGR_MemType_Enum_t M
 ** Notes:
 **   1. After all command validation is performed, this function is called to
 **      do the memory write
-**   2. From an OO design perspective this is a virtual write function dispatcher
+**   2. From an OO design perspective this is a virtual function dispatcher
+**      for memory types.
 **
 */
 uint8 MEMORY_Write(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemType_Enum_t MemType, 
@@ -667,7 +726,7 @@ uint8 MEMORY_Write(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemType_Enum_
 ** Function: CreateCpuAddr
 **
 ** Notes:
-**   1. Callers assumes error events are sent containing details of the error.
+**   1. Callers assume error events are sent containing details of the error.
 **
 */
 static bool CreateCpuAddr(MEM_MGR_SymbolAddr_t *SymbolAddr, MEM_MGR_CpuAddr_Atom_t *CpuAddr)
@@ -682,12 +741,12 @@ static bool CreateCpuAddr(MEM_MGR_SymbolAddr_t *SymbolAddr, MEM_MGR_CpuAddr_Atom
    // If SymbolName string is NULL then use Offset as the absolute address
    if (MEM_MGR_strnlen(SymbolAddr->Name, MEM_MGR_MAX_SYM_LEN) == 0)
    {
-      *CpuAddr = SymbolAddr->Offset;
+      *CpuAddr  = SymbolAddr->Offset;
       RetStatus = true;
    }
    else
    {
-      // If SymbolName string is not NULL then use offset is applied to symbol address
+      // If SymbolName string is not NULL then add offset to symbol address
       OsStatus = OS_SymbolLookup(CpuAddr, SymbolAddr->Name);
       if (OsStatus == OS_SUCCESS)
       {
@@ -711,7 +770,8 @@ static bool CreateCpuAddr(MEM_MGR_SymbolAddr_t *SymbolAddr, MEM_MGR_CpuAddr_Atom
 ** Function: FillMemBlock
 **
 ** Notes:
-**   None
+**   1. Callers assume this functions sends error events and this function
+**      assumes the MEM_SIZE*_FillBlock() functions send error events.
 **
 */
 static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t MemSize,
@@ -735,10 +795,13 @@ static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t
       case MEM_MGR_MemSize_VOID:
          PspStatus = CFE_PSP_MemSet((void*)DestAddr, (uint8)FillData, ByteCnt);
          RetStatus = (PspStatus == CFE_PSP_SUCCESS);
-         //TODO: Event
+         CFE_EVS_SendEvent(MEMORY_FILL_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
+                           "Void memory fill block failed at destination address %p, byte count %d, status=0x%08X",
+                           (void *)DestAddr, ByteCnt, (unsigned int)PspStatus);  
          break;
       default:
-         //TODO: Event
+         CFE_EVS_SendEvent(MEMORY_FILL_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
+                           "Fill memory block invalid memory size %u received", MemSize); 
          break;
    } /* End mem size switch */
 
@@ -791,7 +854,10 @@ static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, co
 ** Notes:
 **   1. Copy a block of memory from a memory type/size to a local RAM buffer.
 **      This function is typically used for commanded memory types/sizes.
-**   2. From an OO design perspective this is a virtual function dispatcher
+**   2. Callers assume this functions sends error events and this function
+**      assumes the MEM_SIZE*_ReadBlock() functions send error events.
+**   3. From an OO design perspective this is a virtual function dispatcher
+**      for memory types.
 **
 */
 static bool ReadMemBlock(void *DestAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr,  
@@ -815,13 +881,16 @@ static bool ReadMemBlock(void *DestAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr,
       case MEM_MGR_MemSize_VOID:
          PspStatus = CFE_PSP_MemCpy((void*)DestAddr, (void*)SrcCpuAddr, ByteCnt);
          RetStatus = (PspStatus == CFE_PSP_SUCCESS);
-         //TODO: Event
+         CFE_EVS_SendEvent(MEMORY_READ_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
+                           "Void memory read block failed at destination address %p, byte count %d, status=0x%08X",
+                           (void *)DestAddr, ByteCnt, (unsigned int)PspStatus);       
          break;
       default:
-         //TODO: Event
+         CFE_EVS_SendEvent(MEMORY_READ_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
+                           "Read memory block invalid memory size %u received", SrcMemSize);   
          break;
    } /* End mem size switch */
-
+   
    return RetStatus;
     
 } /* End ReadMemBlock() */
@@ -832,13 +901,14 @@ static bool ReadMemBlock(void *DestAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr,
 **
 ** Notes:
 **   1. Build and send the event message containing the dump data
-**   2. Refer to app_cfg.h's macro definition comments for 
+**   2. Refer to app_cfg.h's comments for a description of the event string
+**      macros.
 **
 */
 static bool SendDumpBufToEvent(MEM_MGR_CpuAddr_Atom_t CpuAddr, const uint8 *DumpBuf, uint32 ByteCnt)
 {
 
-   bool   RetStatus = false;
+   bool   RetStatus = true;
 
    const char  EventHdrStr[] = MEMORY_DUMP_TOEVENT_HDR_STR;
    static char EventStr[CFE_MISSION_EVS_MAX_MESSAGE_LENGTH];
@@ -851,7 +921,7 @@ static bool SendDumpBufToEvent(MEM_MGR_CpuAddr_Atom_t CpuAddr, const uint8 *Dump
    strncpy(EventStr, EventHdrStr, sizeof(EventStr));
    EventStrTotalLen = MEM_MGR_strnlen(EventStr, CFE_MISSION_EVS_MAX_MESSAGE_LENGTH);
 
-   EventStrBytePtr = (uint8*)DumpToEventBuf;
+   EventStrBytePtr = (uint8*)Memory->DumpToEventBuf;
    for (i=0; i < ByteCnt; i++)
    {
       // No need to check snprintf return, CFE_SB_MessageStringGet() handles safe concatenation & prevents overflow
@@ -864,7 +934,7 @@ static bool SendDumpBufToEvent(MEM_MGR_CpuAddr_Atom_t CpuAddr, const uint8 *Dump
    /* 
    ** Append tail
    ** This adds up to 33 characters depending on pointer representation including the NUL terminator
-   ** SAD: No need to check snprintf return; CFE_SB_MessageStringGet() handles safe concatenation and
+   ** No need to check snprintf return; CFE_SB_MessageStringGet() handles safe concatenation and
    ** prevents overflow
    */
    snprintf(TempStr, MEMORY_DUMP_TOEVENT_TEMP_CHARS, MEMORY_DUMP_TOEVENT_TRAILER_STR, (void *)CpuAddr);
@@ -882,8 +952,10 @@ static bool SendDumpBufToEvent(MEM_MGR_CpuAddr_Atom_t CpuAddr, const uint8 *Dump
 ** Function: VerifyCpuAddr
 **
 ** Notes:
-**   1. Callers assumes error events are sent containing details of the error
+**   1. Callers assume this functions sends error events and this function
+**      assumes the MEM_SIZE*_VerifyCpuAddr() functions send error events.
 **   2. From an OO design perspective this is a virtual function dispatcher
+**      for memory types.
 **
 */
 static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType,
@@ -903,6 +975,8 @@ static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType,
          RetStatus = MEM_SIZE32_VerifyCpuAddr((uint32*)CpuAddr, PspMemType, MemTypeStr, ByteCnt);
          break;
       default:
+         CFE_EVS_SendEvent(MEMORY_VERIFY_CPU_ADDR_EID, CFE_EVS_EventType_ERROR,
+                           "Verify CPU address invalid memory size %u received", MemSize);       
          break;
    } /* End mem size switch */
 

@@ -44,10 +44,10 @@
 #define MEM_SIZE32_OPT_INCL_EID      (MEM_SIZE32_BASE_EID + 0)
 #define MEM_SIZE32_FILL_BLOCK_EID    (MEM_SIZE32_BASE_EID + 1)
 #define MEM_SIZE32_READ_EID          (MEM_SIZE32_BASE_EID + 2)
-#define MEM_SIZE32_WRITE_EID         (MEM_SIZE32_BASE_EID + 3)
-#define MEM_SIZE32_READ_BLOCK_EID    (MEM_SIZE32_BASE_EID + 4)
-#define MEM_SIZE32_WRITE_BLOCK_EID   (MEM_SIZE32_BASE_EID + 5)
-#define MEM_SIZE32_VER_CPU_ADDR_EID  (MEM_SIZE32_BASE_EID + 6)
+#define MEM_SIZE32_READ_BLOCK_EID    (MEM_SIZE32_BASE_EID + 3)
+#define MEM_SIZE32_VER_CPU_ADDR_EID  (MEM_SIZE32_BASE_EID + 4)
+#define MEM_SIZE32_WRITE_EID         (MEM_SIZE32_BASE_EID + 5)
+#define MEM_SIZE32_WRITE_BLOCK_EID   (MEM_SIZE32_BASE_EID + 6)
 
 
 /************************/
@@ -70,16 +70,6 @@ bool MEM_SIZE32_Read(uint32 *MemAddr, uint32 *Data);
 
 
 /******************************************************************************
-** Function: MEM_SIZE32_Write
-**
-** Notes:
-**   1. Assumes MemType has been verified so no need to report invalid value 
-**
-*/
-bool MEM_SIZE32_Write(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint32 Data);
-
-
-/******************************************************************************
 ** Function: MEM_SIZE32_ReadBlock
 **
 */
@@ -91,6 +81,16 @@ bool MEM_SIZE32_ReadBlock(const uint32 *MemAddr, uint32 *DestAddr, uint32 ByteCn
 **
 */
 bool MEM_SIZE32_VerifyCpuAddr(uint32 *MemAddr, uint32 PspMemType, const char *MemTypeStr, uint32 ByteCnt);
+
+
+/******************************************************************************
+** Function: MEM_SIZE32_Write
+**
+** Notes:
+**   1. Assumes MemType has been verified so no need to report invalid value 
+**
+*/
+bool MEM_SIZE32_Write(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char *MemTypeStr, uint32 Data);
 
 
 /******************************************************************************
