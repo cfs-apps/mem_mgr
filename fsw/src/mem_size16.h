@@ -71,7 +71,7 @@ bool MEM_SIZE16_Read(uint16 *MemAddr, uint16 *Data);
 ** Function: MEM_SIZE16_ReadBlock
 **
 */
-bool MEM_SIZE16_ReadBlock(const uint16 *MemAddr, uint16 *DestAddr, uint32 ByteCnt);
+bool MEM_SIZE16_ReadBlock(uint16 *DstAddr, uint16 **MemAddr, uint32 ByteCnt);
 
 
 /******************************************************************************
@@ -95,7 +95,7 @@ bool MEM_SIZE16_Write(uint16 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const cha
 ** Function: MEM_SIZE16_WriteBlock
 **
 */
-bool MEM_SIZE16_WriteBlock(uint16 *MemAddr, const uint16 *SrcAddr, uint32 ByteCnt);
+bool MEM_SIZE16_WriteBlock(uint16 **MemAddr, const uint16 *SrcAddr, uint32 ByteCnt);
 
 
 #endif /* _mem_size16_ */

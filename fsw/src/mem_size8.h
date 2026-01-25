@@ -73,7 +73,7 @@ bool MEM_SIZE8_Read(uint8 *MemAddr, uint8 *Data);
 ** Function: MEM_SIZE8_ReadBlock
 **
 */
-bool MEM_SIZE8_ReadBlock(const uint8 *MemAddr, uint8 *DestAddr, uint32 ByteCnt);
+bool MEM_SIZE8_ReadBlock(uint8 *DstAddr, uint8 **MemAddr, uint32 ByteCnt);
 
 
 /******************************************************************************
@@ -97,7 +97,7 @@ bool MEM_SIZE8_Write(uint8 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char 
 ** Function: MEM_SIZE8_WriteBlock
 **
 */
-bool MEM_SIZE8_WriteBlock(uint8 *MemAddr, const uint8 *SrcAddr, uint32 ByteCnt);
+bool MEM_SIZE8_WriteBlock(uint8 **MemAddr, const uint8 *SrcAddr, uint32 ByteCnt);
 
 
 #endif /* _mem_size8_ */

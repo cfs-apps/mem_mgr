@@ -16,10 +16,16 @@
 **    Implement the FILE_Class methods
 **
 **  Notes:
-**    1. TODO: Describe OO design
-**    2. MEM_FILE_DumpSymTblCmd() doesn't operate on memory but it is
+**    1. MEM_FILE_DumpSymTblCmd() doesn't operate on memory but it is
 **       included in this class so it runs in the context of the child
 **       task that performs potentially long duration file operations.
+**    2. From an OO design perspective MEM_FILE's relationship to MEMORY
+**       could be thought of in two ways:
+**       A. As a child of MEMORY in which case MEMORY_CmdStatus_t would
+**          be defined by the parent and not need to be duplicated in MEM_FILE 
+**       B. MEM_FILE"uses a" MEMORY object and they share a MEMORY_CmdStatus_t
+**          object. To strictly follow this design would mean defining a
+**          separate MEMORY_CmdStatus_t object that they each reference.
 **
 */
 
@@ -44,7 +50,7 @@
 static bool ComputeFileCrc(const char *Filename, osal_id_t FileHandle, APP_C_FW_CrcUint8_Enum_t CrcType, uint32 *Crc);
 static bool CreateDumpFile(const char *Filename, osal_id_t FileHandle, MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr);
 static bool DumpMemToFile(MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, osal_id_t FileHandle, const char *Filename, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
-static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DestAddr, osal_id_t FileHandle, const char *Filename, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
+static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DstAddr, osal_id_t FileHandle, const char *Filename, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
 static bool ProcessLoadFile(const char *Filename, osal_id_t FileHandle, MEM_MGR_SecFileHdr_t *SecFileHdr, MEM_MGR_CpuAddr_Atom_t *CpuAddr);
 static bool ValidLoadFile(const char *Filename, osal_id_t FileHandle, const MEM_MGR_SecFileHdr_t *SecFileHdr);
 
@@ -60,7 +66,7 @@ static MEM_FILE_Class_t *MemFile = NULL;
 ** Function: MEM_FILE_Constructor
 **
 ** Notes:
-**   None     
+**   None
 **
 */
 void MEM_FILE_Constructor(MEM_FILE_Class_t *MemFilePtr, const INITBL_Class_t *IniTbl)
@@ -113,7 +119,8 @@ void MEM_FILE_Constructor(MEM_FILE_Class_t *MemFilePtr, const INITBL_Class_t *In
 **   1. Perform command message level processing, verify and open file, and
 **      set telemetry response. File content processing is performed by helper
 **      functions.    
-**
+**   2. Utility functions send detailed error events and this function sends a 
+**      general error event indicating the command failed.
 */
 bool MEM_FILE_DumpCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 {
@@ -185,7 +192,12 @@ bool MEM_FILE_DumpCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
                         DumpCmd->ByteCnt, DumpCmd->Filename);
 
    }
-    
+   else
+   {
+      CFE_EVS_SendEvent(MEM_FILE_DUMP_CMD_EID, CFE_EVS_EventType_ERROR,
+                        "Memory load from file command failed. See accompanying event for details");
+   }
+   
    return RetStatus;
 
 } /* End MEM_FILE_DumpCmd() */
@@ -197,8 +209,7 @@ bool MEM_FILE_DumpCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 ** Notes:
 **   1. Perform command message level processing, verify and open file, and
 **      set telemetry response. File content processing is performed by helper
-**      functions.    
-**
+**      functions.
 */
 bool MEM_FILE_DumpSymTblCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 {
@@ -248,7 +259,8 @@ bool MEM_FILE_DumpSymTblCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 **   1. Perform command message level processing, verify and open file, and
 **      set telemetry response. File content processing is performed by helper
 **      functions.    
-**
+**   2. Utility functions send detailed error events and this function sends a 
+**      general error event indicating the command failed.
 */
 bool MEM_FILE_LoadCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 {
@@ -307,7 +319,12 @@ bool MEM_FILE_LoadCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
                         "Successfully loaded %d bytes from %s",
                         SecFileHdr.ByteCnt, LoadCmd->Filename);
    }
-    
+   else
+   {
+      CFE_EVS_SendEvent(MEM_FILE_LOAD_CMD_EID, CFE_EVS_EventType_ERROR,
+                        "Memory load from file command failed. See accompanying event for details");
+   }
+   
    return RetStatus;
 
 } /* End MEM_FILE_LoadCmd() */
@@ -488,6 +505,8 @@ static bool DumpMemToFile(MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, osal_id_t FileHandl
    int32   FileWriteLength;
    int32   PspStatus;
    size_t  BytesProcessed = 0;
+   void   *SrcAddr    = (void *)SrcCpuAddr;
+   void  **SrcAddrPtr = &SrcAddr;
 
    MemFile->TaskBlockCount = 0;
    while (BytesRemaining != 0)
@@ -500,21 +519,29 @@ static bool DumpMemToFile(MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, osal_id_t FileHandl
       switch (MemSize)
       {
          case MEM_MGR_MemSize_8:
-            RetStatus = MEM_SIZE8_ReadBlock((uint8*)SrcCpuAddr, (uint8*)MemFile->IoBuf, FileWriteBlockSize);
+            RetStatus = MEM_SIZE8_ReadBlock((uint8*)MemFile->IoBuf, (uint8**)SrcAddrPtr, FileWriteBlockSize);
             break;
          case MEM_MGR_MemSize_16:
-            RetStatus = MEM_SIZE16_ReadBlock((uint16*)SrcCpuAddr, (uint16*)MemFile->IoBuf, FileWriteBlockSize/2);
+            RetStatus = MEM_SIZE16_ReadBlock((uint16*)MemFile->IoBuf, (uint16**)SrcAddrPtr, FileWriteBlockSize/2);
             break;
          case MEM_MGR_MemSize_32:
-            RetStatus = MEM_SIZE32_ReadBlock((uint32*)SrcCpuAddr, (uint32*)MemFile->IoBuf, FileWriteBlockSize/4);
+            RetStatus = MEM_SIZE32_ReadBlock((uint32*)MemFile->IoBuf, (uint32**)SrcAddrPtr, FileWriteBlockSize/4);
             break;
          case MEM_MGR_MemSize_VOID:
             PspStatus = CFE_PSP_MemCpy((void*)MemFile->IoBuf, (void*)SrcCpuAddr, FileWriteBlockSize);
+            SrcAddr = (uint8*)SrcAddr + FileWriteBlockSize;
             RetStatus = (PspStatus == CFE_PSP_SUCCESS);
-            //TODO: Event
+            if (!RetStatus)
+            {
+               CFE_EVS_SendEvent(MEM_FILE_DUMP_MEM_TO_FILE_EID, CFE_EVS_EventType_ERROR,
+                                 "Void memory dump to file failed at source address %p, byte count %d, status=0x%08X",
+                                 (void *)SrcAddr, ByteCnt, (unsigned int)PspStatus);  
+            }         
             break;
          default:
-            //TODO: Event
+            CFE_EVS_SendEvent(MEM_FILE_DUMP_MEM_TO_FILE_EID, CFE_EVS_EventType_ERROR,
+                              "Memory dump to file invalid memory size %d; see EDS MemSize definition",
+                              MemSize); 
             break;
       } /* End mem size switch */
 
@@ -553,11 +580,8 @@ static bool DumpMemToFile(MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, osal_id_t FileHandl
 /******************************************************************************
 ** Function: LoadMemFromFile
 **
-** Notes:
-**   None
-**
 */
-static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DestAddr, osal_id_t FileHandle, const char *Filename,
+static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DstCpuAddr, osal_id_t FileHandle, const char *Filename,
                             MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt)
 {
    
@@ -568,7 +592,9 @@ static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DestAddr, osal_id_t FileHandl
    int32   OsStatus;
    int32   PspStatus;
    size_t  BytesProcessed = 0;
-
+   void    *DstAddr = (uint8 *)DstCpuAddr;
+   void    **DstAddrPtr = &DstAddr;
+   
    MemFile->TaskBlockCount = 0;
    // Set file pointer to the start of the load data
    OsStatus = OS_lseek(FileHandle, FILE_HDR_BYTES, OS_SEEK_SET);
@@ -587,21 +613,29 @@ static bool LoadMemFromFile(MEM_MGR_CpuAddr_Atom_t DestAddr, osal_id_t FileHandl
             switch (MemSize)
             {
                case MEM_MGR_MemSize_8:
-                  RetStatus = MEM_SIZE8_WriteBlock((uint8*)DestAddr, (uint8*)MemFile->IoBuf, FileReadBlockSize);
+                  RetStatus = MEM_SIZE8_WriteBlock((uint8**)DstAddrPtr, (uint8*)MemFile->IoBuf, FileReadBlockSize);
                   break;
                case MEM_MGR_MemSize_16:
-                  RetStatus = MEM_SIZE16_WriteBlock((uint16*)DestAddr, (uint16*)MemFile->IoBuf, FileReadBlockSize/2);
+                  RetStatus = MEM_SIZE16_WriteBlock((uint16**)DstAddrPtr, (uint16*)MemFile->IoBuf, FileReadBlockSize/2);
                   break;
                case MEM_MGR_MemSize_32:
-                  RetStatus = MEM_SIZE32_WriteBlock((uint32*)DestAddr, (uint32*)MemFile->IoBuf, FileReadBlockSize/4);
+                  RetStatus = MEM_SIZE32_WriteBlock((uint32**)DstAddrPtr, (uint32*)MemFile->IoBuf, FileReadBlockSize/4);
                   break;
                case MEM_MGR_MemSize_VOID:
-                  PspStatus = CFE_PSP_MemCpy((void*)DestAddr, MemFile->IoBuf, FileReadBlockSize);
+                  PspStatus = CFE_PSP_MemCpy((void*)DstCpuAddr, MemFile->IoBuf, FileReadBlockSize);
+                  DstAddr = (uint8*)DstAddr + FileReadBlockSize;
                   RetStatus = (PspStatus == CFE_PSP_SUCCESS);
-                  //TODO: Event
+                  if (!RetStatus)
+                  {
+                     CFE_EVS_SendEvent(MEM_FILE_LOAD_MEM_FROM_FILE_EID, CFE_EVS_EventType_ERROR,
+                                       "Void memory load from file failed at destination address %p, byte count %d, status=0x%08X",
+                                       (void *)DstCpuAddr, ByteCnt, (unsigned int)PspStatus);  
+                  }         
                   break;
                default:
-                  //TODO: Event
+                  CFE_EVS_SendEvent(MEM_FILE_LOAD_MEM_FROM_FILE_EID, CFE_EVS_EventType_ERROR,
+                                    "Memory load from file invalid memory size %d; see EDS MemSize definition",
+                                    MemSize); 
                   break;
             } /* End mem size switch */
 
@@ -700,9 +734,6 @@ static bool ProcessLoadFile(const char *Filename, osal_id_t FileHandle,
 
 /******************************************************************************
 ** Function: ValidLoadFile
-**
-** Notes:
-**   1. Load file valid
 **
 */
 static bool ValidLoadFile(const char *Filename, osal_id_t FileHandle, const MEM_MGR_SecFileHdr_t *SecFileHdr)

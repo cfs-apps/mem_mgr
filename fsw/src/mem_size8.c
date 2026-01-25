@@ -110,32 +110,35 @@ bool MEM_SIZE8_Read(uint8 *MemAddr, uint8 *Data)
 ** Function: MEM_SIZE8_ReadBlock
 **
 */
-bool MEM_SIZE8_ReadBlock(const uint8 *MemAddr, uint8 *DestAddr, uint32 ByteCnt)
+bool MEM_SIZE8_ReadBlock(uint8 *DstAddr, uint8 **MemAddr, uint32 ByteCnt)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE8
 
    bool   RetStatus = true;
    int32  PspStatus;
    uint32 i;
+   uint8  *SrcAddr = *MemAddr;
 
    for (i = 0; i < ByteCnt; i++)
    {
-      PspStatus = CFE_PSP_MemRead8((MEM_MGR_CpuAddr_Atom_t)MemAddr, DestAddr);
+      PspStatus = CFE_PSP_MemRead8((MEM_MGR_CpuAddr_Atom_t)SrcAddr, DstAddr);
       if (PspStatus == CFE_PSP_SUCCESS)
       {
-         MemAddr++;
-         DestAddr++;
+         SrcAddr++;
+         DstAddr++;
       }
       else
       {
          RetStatus = false;
          CFE_EVS_SendEvent(MEM_SIZE8_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "8-bit memory block read failed at src addr %p, dest addr %p, byte count %d, status=0x%08X",
-                           (void *)MemAddr, (void *)DestAddr, i, (unsigned int)PspStatus);
+                           (void *)SrcAddr, (void *)DstAddr, i, (unsigned int)PspStatus);
          break; 
       }
    } /* End loop */
 
+   *MemAddr = SrcAddr;
+   
    return RetStatus;
 
 #else
@@ -225,32 +228,35 @@ bool MEM_SIZE8_Write(uint8 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const char 
 ** Function: MEM_SIZE8_WriteBlock
 **
 */
-bool MEM_SIZE8_WriteBlock(uint8 *MemAddr, const uint8 *SrcAddr, uint32 ByteCnt)
+bool MEM_SIZE8_WriteBlock(uint8 **MemAddr, const uint8 *SrcAddr, uint32 ByteCnt)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE8
    
    bool   RetStatus = true;
    int32  PspStatus;
    uint32 i;
-
+   uint8  *DstAddr = *MemAddr;
+   
    for (i = 0; i < ByteCnt; i++)
    {
-      PspStatus = CFE_PSP_MemWrite8((MEM_MGR_CpuAddr_Atom_t)MemAddr, *SrcAddr);
+      PspStatus = CFE_PSP_MemWrite8((MEM_MGR_CpuAddr_Atom_t)DstAddr, *SrcAddr);
       if (PspStatus == CFE_PSP_SUCCESS)
       {
          SrcAddr++;
-         MemAddr++;
+         DstAddr++;
       }
       else
       {
          RetStatus = false;
          CFE_EVS_SendEvent(MEM_SIZE8_WRITE_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "8-bit memory write block failed at src addr %p, dest addr %p, byte count %d, status=0x%08X",
-                           (void *)SrcAddr, (void *)MemAddr, i, (unsigned int)PspStatus);
+                           (void *)SrcAddr, (void *)DstAddr, i, (unsigned int)PspStatus);
          break; 
       }
    } /* End loop */
-
+   
+   *MemAddr = DstAddr;
+   
    return RetStatus;
 
 #else

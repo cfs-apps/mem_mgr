@@ -43,9 +43,9 @@
 /*******************************/
 
 static bool CreateCpuAddr(MEM_MGR_SymbolAddr_t *SymbolAddr, MEM_MGR_CpuAddr_Atom_t *CpuAddr);
-static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t MemSize, uint32 FillData, uint32 ByteCnt);
+static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DstAddr, MEM_MGR_MemSize_Enum_t MemSize, uint32 FillData, uint32 ByteCnt);
 static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, const char **MemTypeStr);
-static bool ReadMemBlock(void *DestAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, MEM_MGR_MemSize_Enum_t SrcMemSize, uint32 ByteCnt);
+static bool ReadMemBlock(void *DstAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr, MEM_MGR_MemSize_Enum_t SrcMemSize, uint32 ByteCnt);
 static bool SendDumpBufToEvent(MEM_MGR_CpuAddr_Atom_t CpuAddr, const uint8 *DumpBuf, uint32 ByteCnt);
 static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType, const char *MemTypeStr, MEM_MGR_MemSize_Enum_t MemSize, uint32 ByteCnt);
 
@@ -250,7 +250,7 @@ bool MEMORY_FillCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
          Memory->CmdStatus.ByteCnt  = FillCmd->ByteCnt;
 
          CFE_EVS_SendEvent(MEMORY_FILL_CMD_EID, CFE_EVS_EventType_INFORMATION,
-                           "Successfully filled %d bytes of memory with %d starting at %p", 
+                           "Successfully filled %d bytes of memory with 0x%08X starting at %p", 
                            (int)FillCmd->ByteCnt, FillCmd->Data, (void *)VerifiedMemory.CpuAddr);
 
       }
@@ -323,7 +323,7 @@ bool MEMORY_LoadWithIntDisCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
       {
 
          CFE_EVS_SendEvent(MEMORY_LOAD_INT_DIS_EID, CFE_EVS_EventType_ERROR,
-                           "Load memory with interrupts disabled CRC failed: Expected = 0x%X Calculated = 0x%X",
+                           "Load memory with interrupts disabled CRC failed: Expected = 0x%08X Calculated = 0x%08X",
                            (unsigned int)LoadWithIntDisCmd->Crc, (unsigned int)ComputedCRC);
 
       } /* End invalid CRC */      
@@ -539,8 +539,9 @@ uint8 MEMORY_Read(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemSize_Enum_t
       default:
          ValidRead = true; // Avoid read error event
          CFE_EVS_SendEvent(MEMORY_READ_EID, CFE_EVS_EventType_ERROR,
-                           "Invalid memory read size %d, it must be either %d, %d or %d",
-                           MemSize,MEM_MGR_MemSize_8,MEM_MGR_MemSize_16,MEM_MGR_MemSize_32); 
+                           "Memory read invalid memory size %d; see EDS MemSize definition",
+                           MemSize);
+                              
          break;
    } /* End mem size switch */
    
@@ -705,8 +706,8 @@ uint8 MEMORY_Write(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemType_Enum_
       default:
          ValidWrite = true; // Avoid write error event
          CFE_EVS_SendEvent(MEMORY_WRITE_EID, CFE_EVS_EventType_ERROR,
-                           "Invalid memory write size %d, it must be either %d, %d or %d",
-                           MemSize,MEM_MGR_MemSize_8,MEM_MGR_MemSize_16,MEM_MGR_MemSize_32); 
+                           "Memory write invalid memory size %d; see EDS MemSize definition",
+                           MemSize);             
          break;
    } /* End mem size switch */
    
@@ -774,7 +775,7 @@ static bool CreateCpuAddr(MEM_MGR_SymbolAddr_t *SymbolAddr, MEM_MGR_CpuAddr_Atom
 **      assumes the MEM_SIZE*_FillBlock() functions send error events.
 **
 */
-static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t MemSize,
+static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DstAddr, MEM_MGR_MemSize_Enum_t MemSize,
                          uint32 FillData, uint32 ByteCnt)
 {
 
@@ -784,24 +785,28 @@ static bool FillMemBlock(MEM_MGR_CpuAddr_Atom_t DestAddr, MEM_MGR_MemSize_Enum_t
    switch (MemSize)
    {
       case MEM_MGR_MemSize_8:
-         RetStatus = MEM_SIZE8_FillBlock((uint8*)DestAddr, (uint8)FillData, ByteCnt);
+         RetStatus = MEM_SIZE8_FillBlock((uint8*)DstAddr, (uint8)FillData, ByteCnt);
          break;
       case MEM_MGR_MemSize_16:
-         RetStatus = MEM_SIZE16_FillBlock((uint16*)DestAddr, (uint16)FillData, ByteCnt/2);
+         RetStatus = MEM_SIZE16_FillBlock((uint16*)DstAddr, (uint16)FillData, ByteCnt/2);
          break;
       case MEM_MGR_MemSize_32:
-         RetStatus = MEM_SIZE32_FillBlock((uint32*)DestAddr, FillData, ByteCnt/4);
+         RetStatus = MEM_SIZE32_FillBlock((uint32*)DstAddr, FillData, ByteCnt/4);
          break;
       case MEM_MGR_MemSize_VOID:
-         PspStatus = CFE_PSP_MemSet((void*)DestAddr, (uint8)FillData, ByteCnt);
+         PspStatus = CFE_PSP_MemSet((void*)DstAddr, (uint8)FillData, ByteCnt);
          RetStatus = (PspStatus == CFE_PSP_SUCCESS);
-         CFE_EVS_SendEvent(MEMORY_FILL_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
-                           "Void memory fill block failed at destination address %p, byte count %d, status=0x%08X",
-                           (void *)DestAddr, ByteCnt, (unsigned int)PspStatus);  
+         if (!RetStatus)
+         {
+            CFE_EVS_SendEvent(MEMORY_FILL_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
+                              "Void memory fill block failed at destination address %p, byte count %d, status=0x%08X",
+                              (void *)DstAddr, ByteCnt, (unsigned int)PspStatus);  
+         }
          break;
       default:
          CFE_EVS_SendEvent(MEMORY_FILL_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
-                           "Fill memory block invalid memory size %u received", MemSize); 
+                           "Fill memory block invalid memory size %u; see EDS MemSize definition",
+                           MemSize);
          break;
    } /* End mem size switch */
 
@@ -839,7 +844,8 @@ static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, co
          break;
       default:
          CFE_EVS_SendEvent(MEMORY_GET_PSP_MEM_TYPE_EID, CFE_EVS_EventType_ERROR,
-                          "Invalid memory type %u received", MemType);      
+                          "Invalid memory type %u; see EDS MemType definition",
+                          MemType);      
          break;
    } /* End mem type switch */
 
@@ -860,34 +866,41 @@ static bool GetPspMemType(MEM_MGR_MemType_Enum_t MemType, uint32 *PspMemType, co
 **      for memory types.
 **
 */
-static bool ReadMemBlock(void *DestAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr,  
+static bool ReadMemBlock(void *DstAddr, MEM_MGR_CpuAddr_Atom_t SrcCpuAddr,  
                          MEM_MGR_MemSize_Enum_t SrcMemSize, uint32 ByteCnt)
 {
 
    bool   RetStatus = false;
    int32  PspStatus;
+   void   *SrcAddr = (uint8 *)SrcCpuAddr;
+   void   **SrcAddrPtr = &SrcAddr;
    
    switch (SrcMemSize)
    {
       case MEM_MGR_MemSize_8:
-         RetStatus = MEM_SIZE8_ReadBlock((uint8*)SrcCpuAddr, (uint8*)DestAddr, ByteCnt);
+         RetStatus = MEM_SIZE8_ReadBlock((uint8*)DstAddr, (uint8**)SrcAddrPtr, ByteCnt);
          break;
       case MEM_MGR_MemSize_16:
-         RetStatus = MEM_SIZE16_ReadBlock((uint16*)SrcCpuAddr, (uint16*)DestAddr, ByteCnt/2);
+         RetStatus = MEM_SIZE16_ReadBlock((uint16*)DstAddr, (uint16**)SrcAddrPtr, ByteCnt/2);
          break;
       case MEM_MGR_MemSize_32:
-         RetStatus = MEM_SIZE32_ReadBlock((uint32*)SrcCpuAddr, (uint32*)DestAddr, ByteCnt/4);
+         RetStatus = MEM_SIZE32_ReadBlock((uint32*)DstAddr, (uint32**)SrcAddrPtr, ByteCnt/4);
          break;
       case MEM_MGR_MemSize_VOID:
-         PspStatus = CFE_PSP_MemCpy((void*)DestAddr, (void*)SrcCpuAddr, ByteCnt);
+         PspStatus = CFE_PSP_MemCpy((void*)DstAddr, (void*)SrcAddrPtr, ByteCnt);
+         SrcAddr = (uint8*)SrcAddr + ByteCnt;
          RetStatus = (PspStatus == CFE_PSP_SUCCESS);
-         CFE_EVS_SendEvent(MEMORY_READ_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
+         if (!RetStatus)
+         {
+            CFE_EVS_SendEvent(MEMORY_READ_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "Void memory read block failed at destination address %p, byte count %d, status=0x%08X",
-                           (void *)DestAddr, ByteCnt, (unsigned int)PspStatus);       
+                           (void *)DstAddr, ByteCnt, (unsigned int)PspStatus);
+         }
          break;
       default:
          CFE_EVS_SendEvent(MEMORY_READ_MEM_BLOCK_EID, CFE_EVS_EventType_ERROR,
-                           "Read memory block invalid memory size %u received", SrcMemSize);   
+                           "Memory read block invalid memory size %d; see EDS MemSize definition",
+                           SrcMemSize);
          break;
    } /* End mem size switch */
    
@@ -976,7 +989,8 @@ static bool VerifyCpuAddr(MEM_MGR_CpuAddr_Atom_t CpuAddr, uint32 PspMemType,
          break;
       default:
          CFE_EVS_SendEvent(MEMORY_VERIFY_CPU_ADDR_EID, CFE_EVS_EventType_ERROR,
-                           "Verify CPU address invalid memory size %u received", MemSize);       
+                           "Verify CPU address invalid memory size %u; see EDS MemSize definition",
+                           MemSize);
          break;
    } /* End mem size switch */
 

@@ -102,7 +102,7 @@ typedef struct
 /******************************************************************************
 ** Function: MEM_FILE_Constructor
 **
-** Initialize the example object to a known state
+** Initialize the mem_file object to a known state
 **
 ** Notes:
 **   1. This must be called prior to any other function.

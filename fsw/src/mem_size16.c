@@ -109,33 +109,37 @@ bool MEM_SIZE16_Read(uint16 *MemAddr, uint16 *Data)
 ** Function: MEM_SIZE16_ReadBlock
 **
 */
-bool MEM_SIZE16_ReadBlock(const uint16 *MemAddr, uint16 *DestAddr, uint32 ByteCnt)
+bool MEM_SIZE16_ReadBlock(uint16 *DstAddr, uint16 **MemAddr, uint32 ByteCnt)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE16
    
    bool   RetStatus = true;
    int32  PspStatus;
    uint32 i;
-
+   uint16 *SrcAddr = *MemAddr;
+   
    for (i = 0; i < ByteCnt; i++)
    {
-      PspStatus = CFE_PSP_MemRead16((MEM_MGR_CpuAddr_Atom_t)MemAddr, DestAddr);
+      PspStatus = CFE_PSP_MemRead16((MEM_MGR_CpuAddr_Atom_t)SrcAddr, DstAddr);
       if (PspStatus == CFE_PSP_SUCCESS)
       {
-         MemAddr++;
-         DestAddr++;
+         SrcAddr++;
+         DstAddr++;
       }
       else
       {
          RetStatus = false;
          CFE_EVS_SendEvent(MEM_SIZE16_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "16-bit memory block read failed at source address %p, destination address %p, byte count %d, status=0x%08X",
-                           (void *)MemAddr, (void *)DestAddr, i, (unsigned int)PspStatus);
+                           (void *)SrcAddr, (void *)DstAddr, i, (unsigned int)PspStatus);
          break; 
       }
    } /* End loop */
 
+   *MemAddr = SrcAddr;
+   
    return RetStatus;
+
 #else
    CFE_EVS_SendEvent(MEM_SIZE16_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
    return false;
@@ -233,32 +237,35 @@ bool MEM_SIZE16_Write(uint16 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const cha
 ** Function: MEM_SIZE16_WriteBlock
 **
 */
-bool MEM_SIZE16_WriteBlock(uint16 *MemAddr, const uint16 *SrcAddr, uint32 ByteCnt)
+bool MEM_SIZE16_WriteBlock(uint16 **MemAddr, const uint16 *SrcAddr, uint32 ByteCnt)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE16
    
    bool   RetStatus = true;
    int32  PspStatus;
    uint32 i;
-
+   uint16 *DstAddr = *MemAddr;
+   
    for (i = 0; i < ByteCnt; i++)
    {
-      PspStatus = CFE_PSP_MemWrite16((MEM_MGR_CpuAddr_Atom_t)MemAddr, *SrcAddr);
+      PspStatus = CFE_PSP_MemWrite16((MEM_MGR_CpuAddr_Atom_t)DstAddr, *SrcAddr);
       if (PspStatus == CFE_PSP_SUCCESS)
       {
          SrcAddr++;
-         MemAddr++;
+         DstAddr++;
       }
       else
       {
          RetStatus = false;
          CFE_EVS_SendEvent(MEM_SIZE16_WRITE_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "16-bit memory write block failed at src addr %p, dest addr %p, byte count %d, status=0x%08X",
-                           (void *)SrcAddr, (void *)MemAddr, i, (unsigned int)PspStatus);
+                           (void *)SrcAddr, (void *)DstAddr, i, (unsigned int)PspStatus);
          break; 
       }
    } /* End loop */
 
+   *MemAddr = DstAddr;
+   
    return RetStatus;
 
 #else

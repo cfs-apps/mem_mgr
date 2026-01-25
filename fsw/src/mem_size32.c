@@ -111,33 +111,37 @@ bool MEM_SIZE32_Read(uint32 *MemAddr, uint32 *Data)
 ** Function: MEM_SIZE32_ReadBlock
 **
 */
-bool MEM_SIZE32_ReadBlock(const uint32 *MemAddr, uint32* DestAddr, uint32 ByteCnt)
+bool MEM_SIZE32_ReadBlock(uint32 *DstAddr, uint32 **MemAddr, uint32 ByteCnt)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE32
 
    bool   RetStatus = true;
    int32  PspStatus;
    uint32 i;
-
+   uint32 *SrcAddr = *MemAddr;
+   
    for (i = 0; i < ByteCnt; i++)
    {
-      PspStatus = CFE_PSP_MemRead32((MEM_MGR_CpuAddr_Atom_t)MemAddr, DestAddr);
+      PspStatus = CFE_PSP_MemRead32((MEM_MGR_CpuAddr_Atom_t)SrcAddr, DstAddr);
       if (PspStatus == CFE_PSP_SUCCESS)
       {
-         MemAddr++;
-         DestAddr++;
+         SrcAddr++;
+         DstAddr++;
       }
       else
       {
          RetStatus = false;
          CFE_EVS_SendEvent(MEM_SIZE32_READ_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "32-bit memory block read failed at source address %p, destination address %p, byte count %d, status=0x%08X",
-                           (void *)MemAddr, (void *)DestAddr, i, (unsigned int)PspStatus);
+                           (void *)SrcAddr, (void *)DstAddr, i, (unsigned int)PspStatus);
          break; 
       }
    } /* End loop */
-
+   
+   *MemAddr = SrcAddr;
+   
    return RetStatus;
+   
 #else
    CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
    return false;
@@ -235,33 +239,37 @@ bool MEM_SIZE32_Write(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const cha
 ** Function: MEM_SIZE32_WriteBlock
 **
 */
-bool MEM_SIZE32_WriteBlock(uint32 *MemAddr, const uint32 *SrcAddr, uint32 ByteCnt)
+bool MEM_SIZE32_WriteBlock(uint32 **MemAddr, const uint32 *SrcAddr, uint32 ByteCnt)
 {
 #if defined MEM_MGR_OPT_INCL_MEM_SIZE32
 
    bool   RetStatus = true;
    int32  PspStatus;
    uint32 i;
-
+   uint32 *DstAddr = *MemAddr;
+   
    for (i = 0; i < ByteCnt; i++)
    {
-      PspStatus = CFE_PSP_MemWrite32((MEM_MGR_CpuAddr_Atom_t)MemAddr, *SrcAddr);
+      PspStatus = CFE_PSP_MemWrite32((MEM_MGR_CpuAddr_Atom_t)DstAddr, *SrcAddr);
       if (PspStatus == CFE_PSP_SUCCESS)
       {
          SrcAddr++;
-         MemAddr++;
+         DstAddr++;
       }
       else
       {
          RetStatus = false;
          CFE_EVS_SendEvent(MEM_SIZE32_WRITE_BLOCK_EID, CFE_EVS_EventType_ERROR,
                            "32-bit memory block write failed at source address %p, destination address %p, byte count %d, status=0x%08X",
-                           (void *)SrcAddr, (void *)MemAddr, i, (unsigned int)PspStatus);
+                           (void *)SrcAddr, (void *)DstAddr, i, (unsigned int)PspStatus);
          break; 
       }
    } /* End loop */
 
+   *MemAddr = DstAddr;
+   
    return RetStatus;
+   
 #else
    CFE_EVS_SendEvent(MEM_SIZE32_OPT_INCL_EID, CFE_EVS_EventType_ERROR, MEM_MGR_OPT_INCL_MSG);
    return false;

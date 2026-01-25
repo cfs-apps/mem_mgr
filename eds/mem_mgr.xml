@@ -115,13 +115,18 @@
 
       <ContainerDataType name="SymbolAddr">
         <EntryList>
-          <Entry name="Offset" type="MEM_MGR/CpuAddr"    shortDescription="Optional symbol offset that is used as the absolute address if the Name string is NULL" />
           <Entry name="Name"   type="MEM_MGR/SymbolName" shortDescription="Symbol name" />
+          <Entry name="Offset" type="MEM_MGR/CpuAddr"    shortDescription="Optional symbol offset that is used as the absolute address if the Name string is NULL" />
         </EntryList>
       </ContainerDataType>
 
-      <StringDataType name="DwellDataBuf" length="${MEM_MGR/DWELL_DATA_BUF_LEN}" shortDescription="" />
-
+      <StringDataType name="DwellDataStrBuf" length="${MEM_MGR/DWELL_DATA_BUF_LEN}" shortDescription="" />
+      <ArrayDataType name="DwellDataBinBuf" dataTypeRef="BASE_TYPES/uint8">
+        <DimensionList>
+           <Dimension size="${MEM_MGR/DWELL_DATA_BUF_LEN}"/>
+        </DimensionList>
+      </ArrayDataType>
+      
       <!--
          Directly manipulating memory is risky, therefore it is helpful
          to identify in telemetry the last function performed on memory.
@@ -333,7 +338,7 @@
           <Entry name="Delay"       type="BASE_TYPES/uint16"  shortDescription="" />
           <Entry name="AddressCnt"  type="BASE_TYPES/uint16"  shortDescription="Number of dwell addresses " />
           <Entry name="DataByteLen" type="BASE_TYPES/uint16"  shortDescription="Number of bytes of data in the message" /> 
-          <Entry name="Data"        type="MEM_MGR/DwellDataBuf" />
+          <Entry name="Data"        type="MEM_MGR/DwellDataBinBuf" />
         </EntryList>
       </ContainerDataType>
 

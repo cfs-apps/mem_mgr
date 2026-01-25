@@ -73,7 +73,7 @@ bool MEM_SIZE32_Read(uint32 *MemAddr, uint32 *Data);
 ** Function: MEM_SIZE32_ReadBlock
 **
 */
-bool MEM_SIZE32_ReadBlock(const uint32 *MemAddr, uint32 *DestAddr, uint32 ByteCnt);
+bool MEM_SIZE32_ReadBlock(uint32 *DstAddr, uint32 **MemAddr, uint32 ByteCnt);
 
 
 /******************************************************************************
@@ -97,7 +97,7 @@ bool MEM_SIZE32_Write(uint32 *MemAddr, MEM_MGR_MemType_Enum_t MemType, const cha
 ** Function: MEM_SIZE32_WriteBlock
 **
 */
-bool MEM_SIZE32_WriteBlock(uint32 *MemAddr, const uint32 *SrcData, uint32 ByteCnt);
+bool MEM_SIZE32_WriteBlock(uint32 **MemAddr, const uint32 *SrcAddr, uint32 ByteCnt);
 
 
 #endif /* _mem_size32_ */
