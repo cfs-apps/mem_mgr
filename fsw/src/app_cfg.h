@@ -141,7 +141,13 @@ DECLARE_ENUM(Config,APP_CONFIG)
 */
 
 #define MEM_DWELL_TBL_NAME                "Memory Dwell" 
-#define MEM_DWELL_TBL_JSON_FILE_MAX_CHAR  4000 
+#define MEM_DWELL_TBL_JSON_FILE_MAX_CHAR  4000
+
+// Access a variable that is an array of dwells
+// Dwell ID values are defined in EDS by MEM_MGR_DwellId_Enum_t
+#define MEM_DWELL_VAR_PTR(var,id) (&var[id-1]) 
+
+
 
 
 /*

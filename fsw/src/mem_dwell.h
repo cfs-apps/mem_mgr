@@ -14,7 +14,7 @@
 **
 **  Purpose:
 **    Define memory dwell class that manages the creation of dwell telemetry
-**    packets that contain from meory locations defined in dwell tables.
+**    packets that contain data from memory locations defined in dwell tables.
 **
 **  Notes:
 **    1. MEM_DWELL_TBL defines what is contained in each dwell telemetry 
@@ -51,7 +51,7 @@
 #define MEM_DWELL_STOP_CMD_EID        (MEM_DWELL_BASE_EID + 5)
 #define MEM_DWELL_LOAD_ENTRY_CMD_EID  (MEM_DWELL_BASE_EID + 6)
 #define MEM_DWELL_EXECUTE_ERR_EID     (MEM_DWELL_BASE_EID + 7)
-
+#define MEM_DWELL_ACCEPT_TBL_EID      (MEM_DWELL_BASE_EID + 8)
 
 /**********************/
 /** Type Definitions **/
@@ -146,6 +146,12 @@ bool MEM_DWELL_ChildTask(CHILDMGR_Class_t* ChildMgr);
 /******************************************************************************
 ** Function: MEM_DWELL_LoadEntryCmd
 **
+** Notes:
+**   1. Caution must be used when using this command. The table load validation
+**      does not validate entries after the first unused entry. If an entry is 
+**      loaded that "bridges" the current used entries to unvalidated entires
+**      there could be potentially harmful behavior. 
+**
 */
 bool MEM_DWELL_LoadEntryCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
 
@@ -176,7 +182,6 @@ bool MEM_DWELL_StartCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
 **
 */
 bool MEM_DWELL_StopCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
-
 
 
 #endif /* _mem_dwell_ */

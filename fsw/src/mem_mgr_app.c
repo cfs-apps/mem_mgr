@@ -45,7 +45,6 @@
 #define  DWELLCHILD_OBJ (&(MemMgr.DwellChildMgr))
 #define  MEMFILE_OBJ    (&(MemMgr.MemFile))
 
-#define MEM_DWELL_CTRL_PTR(id) (&(MemMgr.MemDwell.Ctrl[id-1]))
 
 /*******************************/
 /** Local Function Prototypes **/
@@ -335,14 +334,22 @@ static void SendStatusTlm(void)
    MEM_MGR_DwellId_Enum_t      DwellId;
    MEM_DWELL_Ctrl_t            *DwellCtrl;
    MEM_MGR_StatusTlm_Payload_t *Payload = &MemMgr.StatusTlm.Payload;
-
+   MEM_MGR_DwellStatus_t       *DwellStatus;
+   MEM_DWELL_TBL_Dwell_t       *DwellTbl;
+   
+   /* Good design practice in case app expands to more than one table */
+   const TBLMGR_Tbl_t *LastTbl = TBLMGR_GetLastTblStatus(TBLMGR_OBJ);
+   
    /*
    ** Framework Data
    */
    
    Payload->ValidCmdCnt   = MemMgr.CmdMgr.ValidCmdCnt;
    Payload->InvalidCmdCnt = MemMgr.CmdMgr.InvalidCmdCnt;
-
+   
+   Payload->LastTblAction       = LastTbl->LastAction;
+   Payload->LastTblActionStatus = LastTbl->LastActionStatus;
+   
    Payload->EepromWriteEna  = MemMgr.Memory.EepromWriteEna;
    Payload->LastMemFunction = MemMgr.Memory.CmdStatus.Function;
    Payload->LastMemAddr     = MemMgr.Memory.CmdStatus.Addr;
@@ -354,13 +361,17 @@ static void SendStatusTlm(void)
    
    for (DwellId = MEM_MGR_DwellId_Enum_t_MIN; DwellId <= MEM_MGR_DwellId_Enum_t_MAX; DwellId++)
    {
-      DwellCtrl = MEM_DWELL_CTRL_PTR(DwellId);
-      Payload->DwellStatus[DwellId-1].DelayCnt   = DwellCtrl->Tbl.DelayCnts;
-      Payload->DwellStatus[DwellId-1].EntryCnt   = DwellCtrl->Tbl.AddrCnt;
-      Payload->DwellStatus[DwellId-1].ByteCnt    = DwellCtrl->Tbl.DataLen;
-      Payload->DwellStatus[DwellId-1].DataOffset = DwellCtrl->TlmDataOffset;
-      Payload->DwellStatus[DwellId-1].EntryIndex = DwellCtrl->EntryIndex;
-      Payload->DwellStatus[DwellId-1].DelayTimer = DwellCtrl->DelayCntDown;                  
+      DwellTbl    = MEM_DWELL_VAR_PTR(MemMgr.MemDwell.Tbl.Dwell,DwellId);
+      DwellCtrl   = MEM_DWELL_VAR_PTR(MemMgr.MemDwell.Ctrl,DwellId);
+      DwellStatus = MEM_DWELL_VAR_PTR(Payload->DwellStatus,DwellId);
+      
+      DwellStatus->Enabled    = DwellTbl->Enabled;
+      DwellStatus->DelayCnt   = DwellCtrl->Tbl.DelayCnts;
+      DwellStatus->EntryCnt   = DwellCtrl->Tbl.AddrCnt;
+      DwellStatus->ByteCnt    = DwellCtrl->Tbl.DataLen;
+      DwellStatus->DataOffset = DwellCtrl->TlmDataOffset;
+      DwellStatus->EntryIndex = DwellCtrl->EntryIndex;
+      DwellStatus->DelayTimer = DwellCtrl->DelayCntDown;                  
    } /* End dwell ID loop */ 
    
    CFE_SB_TimeStampMsg(CFE_MSG_PTR(MemMgr.StatusTlm.TelemetryHeader));

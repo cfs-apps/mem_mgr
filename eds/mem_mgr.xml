@@ -72,8 +72,8 @@
         </EnumerationList>
       </EnumeratedDataType>
       
-      <Define name="DWELL_ENTRIES"      value="4" shortDescription="Number of memory locations that can be monitored"/>
-      <Define name="MAX_ENTRY_BYTES"    value="4" shortDescription="Number of memory locations that can be monitored"/>
+      <Define name="DWELL_ENTRIES"      value="16" shortDescription="Number of memory locations that can be monitored"/>
+      <Define name="MAX_ENTRY_BYTES"    value="4"  shortDescription="Number of memory locations that can be monitored"/>
       <Define name="DWELL_DATA_BUF_LEN" value="${DWELL_ENTRIES*MAX_ENTRY_BYTES}" shortDescription="Data buffer sized to support 32-bit data values for each entry"/>
       <Define name="DWELL_ALIGN_DWORD"  value="1"  shortDescription="0-Align integers to 16-bit boundary, 1-Align integers to 32-bit boundary, "/>
       
@@ -280,8 +280,8 @@
         <EntryList>
           <Entry name="DwellId"    type="MEM_MGR/DwellId" />
           <Entry name="EntryIndex" type="BASE_TYPES/uint16" shortDescription="Index into 'dwelled' memory record" />
+          <Entry name="Delay"      type="BASE_TYPES/uint16" shortDescription="Execution Delay: 0 runs every execution cycle" />
           <Entry name="MemSize"    type="MemSize"           shortDescription="Number of bytes being 'dwelled' "/>
-          <Entry name="Delay "     type="BASE_TYPES/uint16" shortDescription="Execution Delay: 0 runs every execution cycle" />
           <Entry name="SymbolAddr" type="MEM_MGR/SymbolAddr" />
         </EntryList>
       </ContainerDataType>
@@ -318,16 +318,18 @@
       
       <ContainerDataType name="StatusTlm_Payload" shortDescription="App's state and status summary">
         <EntryList>
-          <Entry name="ValidCmdCnt"      type="BASE_TYPES/uint16" />
-          <Entry name="InvalidCmdCnt"    type="BASE_TYPES/uint16" />
-          <Entry name="EepromWriteEna"   type="APP_C_FW/BooleanUint8" />
-          <Entry name="LastMemFunction"  type="MemFunction" />
-          <Entry name="LastMemAddr"      type="MEM_MGR/CpuAddr" />
-          <Entry name="LastMemType"      type="MemType" />
-          <Entry name="LastMemSize"      type="MemSize" />
-          <Entry name="LastMemByteCnt"   type="BASE_TYPES/uint32" />
-          <Entry name="LastMemFilename"  type="BASE_TYPES/PathName"/>
-          <Entry name="DwellStatus"      type="DwellStatusEntries"/>
+          <Entry name="ValidCmdCnt"         type="BASE_TYPES/uint16" />
+          <Entry name="InvalidCmdCnt"       type="BASE_TYPES/uint16" />
+          <Entry name="LastTblAction"       type="APP_C_FW/TblActions" />
+          <Entry name="LastTblActionStatus" type="APP_C_FW/TblActionStatus" />
+          <Entry name="EepromWriteEna"      type="APP_C_FW/BooleanUint8" />
+          <Entry name="LastMemFunction"     type="MemFunction" />
+          <Entry name="LastMemAddr"         type="MEM_MGR/CpuAddr" />
+          <Entry name="LastMemType"         type="MemType" />
+          <Entry name="LastMemSize"         type="MemSize" />
+          <Entry name="LastMemByteCnt"      type="BASE_TYPES/uint32" />
+          <Entry name="LastMemFilename"     type="BASE_TYPES/PathName"/>
+          <Entry name="DwellStatus"         type="DwellStatusEntries"/>
         </EntryList>
       </ContainerDataType>
 

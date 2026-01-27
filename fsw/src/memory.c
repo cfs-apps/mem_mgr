@@ -359,7 +359,7 @@ bool MEMORY_LookupSymbolCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
 
    // Copy and verify valid string from command message
    CFE_SB_MessageStringGet(SymbolName, LookupSymbolCmd->Name, NULL, sizeof(SymbolName), sizeof(LookupSymbolCmd->Name));
-OS_printf("Cmd Symbol: %s, Local Symbol: %s\n",LookupSymbolCmd->Name,SymbolName);
+
    if (MEM_MGR_strnlen(SymbolName, MEM_MGR_MAX_SYM_LEN) == 0)
    {
       CFE_EVS_SendEvent(MEMORY_LOOKUP_SYMBOL_EID, CFE_EVS_EventType_ERROR,
@@ -564,8 +564,12 @@ uint8 MEMORY_Read(MEMORY_VerifiedMemory_t VerifiedMemory, MEM_MGR_MemSize_Enum_t
 void MEMORY_ResetStatus(void)
 {
    
-   // Nothing to reset
-   
+   CFE_PSP_MemSet((void*)&Memory->CmdStatus, 0, sizeof(MEMORY_CmdStatus_t));
+
+   Memory->CmdStatus.Function = MEM_MGR_MemFunction_NONE_PERFORMED;
+   Memory->CmdStatus.Type     = MEM_MGR_MemType_UNDEF;
+   Memory->CmdStatus.Size     = MEM_MGR_MemSize_UNDEF;
+
 } /* End MEMORY_ResetStatus() */
 
 

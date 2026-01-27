@@ -41,8 +41,6 @@
 
 #define JSON_MAX_KW_LEN  16  // Maximum length of short keywords
 
-#define MEM_DWELL_TBL_PTR(var,id) (&var[id-1]) // Access array of MEM_DWELL_TBL_Dwell_t using dwell IDs
-
 
 /*
 ** Event Message IDs
@@ -51,7 +49,7 @@
 #define MEM_DWELL_TBL_LOAD_EID        (MEM_DWELL_TBL_BASE_EID + 0)
 #define MEM_DWELL_TBL_VALID_EID       (MEM_DWELL_TBL_BASE_EID + 1)
 #define MEM_DWELL_TBL_DUMP_EID        (MEM_DWELL_TBL_BASE_EID + 2)
-#define MEM_DWELL_TBL_LOAD_ENTRY_EID  (MEM_DWELL_TBL_BASE_EID + 3) //TODO: Need?
+#define MEM_DWELL_TBL_LOAD_ENTRY_EID  (MEM_DWELL_TBL_BASE_EID + 3)
 
 /**********************/
 /** Type Definitions **/

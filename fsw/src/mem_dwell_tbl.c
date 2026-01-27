@@ -254,6 +254,11 @@ bool MEM_DWELL_TBL_LoadEntry(MEM_DWELL_TBL_Dwell_Entry_t *Entry,
          RetStatus = true;
       }
    }
+   else
+   {
+      CFE_EVS_SendEvent(MEM_DWELL_TBL_LOAD_ENTRY_EID, CFE_EVS_EventType_ERROR, 
+                        "Invalid memory size %d; see EDS MemSize definition",MemSize);    
+   }
 
    return RetStatus;
    
@@ -326,7 +331,7 @@ static bool LoadJsonData(size_t JsonFileLen)
    */
    for (i= MEM_MGR_DwellId_Enum_t_MIN; i <= MEM_MGR_DwellId_Enum_t_MAX; i++)
    {
-      memcpy((void*)MEM_DWELL_TBL_PTR(DwellTbl,i), (void*)MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,i),
+      memcpy((void*)MEM_DWELL_VAR_PTR(DwellTbl,i), (void*)MEM_DWELL_VAR_PTR(MemDwellTbl->Dwell,i),
              sizeof(MEM_DWELL_TBL_Dwell_t));
    }
 
@@ -342,7 +347,6 @@ static bool LoadJsonData(size_t JsonFileLen)
    }
    else
    {
-
       if (ValidTblData())
       {
          bool OwnerAcceptedTbl = true;
@@ -355,8 +359,8 @@ static bool LoadJsonData(size_t JsonFileLen)
 
             for (i= MEM_MGR_DwellId_Enum_t_MIN; i <= MEM_MGR_DwellId_Enum_t_MAX; i++)
             {
-               memcpy((void*)MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,i),
-                      (void*)MEM_DWELL_TBL_PTR(DwellTbl,i), sizeof(MEM_DWELL_TBL_Dwell_t));
+               memcpy((void*)MEM_DWELL_VAR_PTR(MemDwellTbl->Dwell,i),
+                      (void*)MEM_DWELL_VAR_PTR(DwellTbl,i), sizeof(MEM_DWELL_TBL_Dwell_t));
             }
 
             MemDwellTbl->LastLoadCnt = ObjLoadCnt;
@@ -378,25 +382,28 @@ static bool LoadJsonData(size_t JsonFileLen)
 ** Function: ValidTblData
 **
 ** Notes:
-**  1. Validates new table data before it is accepted.
-**  2. Sends an event for first detected error.
+**  1. Validates new table entries before the table owner's table acceptance
+**     function is called. See the code comment block below for for Valid entry
+**     arrays. This function validates the integrity of the entries and the
+**     table owner's fucntion validates the dwell functionality. 
 */
 static bool ValidTblData(void)
 {
    bool    RetStatus = true;
-   bool    EntryLoaded;
-   uint16  id, i;
+   bool    EntryLoaded, UnusedEntry;
+   uint16  DwellId, i, EntryCnt;
    MEM_DWELL_TBL_Dwell_t       *DwellTblPtr;
    MEM_DWELL_TBL_Dwell_Entry_t *Entry;
- 
-   for (id=1; id <= MEM_MGR_DWELL_ID_CNT; id++)
+
+
+   for (DwellId=1; DwellId <= MEM_MGR_DWELL_ID_CNT && RetStatus; DwellId++)
    {
-      DwellTblPtr = MEM_DWELL_TBL_PTR(DwellTbl,id);
-      if (DwellTblPtr->Id != id)
+      DwellTblPtr = MEM_DWELL_VAR_PTR(DwellTbl,DwellId);
+      if (DwellTblPtr->Id != DwellId)
       {
          CFE_EVS_SendEvent(MEM_DWELL_TBL_VALID_EID, CFE_EVS_EventType_ERROR, 
                            "Invalid table ID %d, it must match physical table ID %d",
-                           DwellTblPtr->Id, id);
+                           DwellTblPtr->Id, DwellId);
          RetStatus = false;
       }
       if (RetStatus)
@@ -412,20 +419,64 @@ static bool ValidTblData(void)
                RetStatus = false;
             }
          }
-      } /* End if valid ID */
+      } /* End if valid Dwell ID */
+
       if (RetStatus)
       {
-         for (i=0; i < MEM_MGR_DWELL_ENTRIES; i++)
+         /*
+         ** A MemSize value of 0 (actually any unused value) is used to
+         ** indicate an unused entry. Entries after a table's first unused
+         ** entry are not validated. The possible valid tables include:
+         ** - No used entries, the first entry is unused
+         ** - 1..MEM_MGR_DWELL_ENTRIES with one unused entry if less than
+         **   max entries.
+         **  
+         ** An enabled table should have at least one used entry. It is still
+         ** accepted with a warning.
+         **
+         ** Memory manager should only be used by FSW engineers so an effort
+         ** was made to keep the logic simple and safe from gross errors, but
+         ** not too constrained.          
+         */
+         
+         EntryCnt = 0;
+         UnusedEntry = false;
+         for (i=0; i < MEM_MGR_DWELL_ENTRIES && RetStatus; i++)
          {
-            Entry = &DwellTblPtr->Entry[i];
-            EntryLoaded = MEM_DWELL_TBL_LoadEntry(Entry, Entry->Delay,Entry->MemSize,Entry->SymbolAddr);
-            if (!EntryLoaded)
+            Entry = &DwellTblPtr->Entry[i];            
+            if (MEM_DWELL_TBL_EntryMemSizeEnabled(Entry))
             {
-               Entry->VerifiedMemory.CpuAddr = 0;
-               Entry->VerifiedMemory.TypeStr = MEMORY_TypeStr(MEM_MGR_MemType_UNDEF);
+               if (!UnusedEntry)
+               {
+                  EntryLoaded = MEM_DWELL_TBL_LoadEntry(Entry, Entry->Delay,Entry->MemSize,Entry->SymbolAddr);
+                  if (EntryLoaded)
+                  {
+                     EntryCnt++;
+                  }
+                  else
+                  {
+                     RetStatus = false;
+                     CFE_EVS_SendEvent(MEM_DWELL_TBL_VALID_EID, CFE_EVS_EventType_ERROR, 
+                                       "Error in dwell table %d. Invalid entry at index %d",
+                                       DwellId, i);
+                  }
+               } /* Haven't hit an unused entry */
+            } /* End if enabled entry */
+            else
+            {
+               UnusedEntry = true;
             }
-         }
-      }      
+            
+         } /* End dwell entry loop */
+      } /* End if valid ID & Enable */
+
+      if (RetStatus && DwellTblPtr->Enabled && EntryCnt == 0)
+      {
+         CFE_EVS_SendEvent(MEM_DWELL_TBL_VALID_EID, CFE_EVS_EventType_INFORMATION, 
+                           "Warning with dwell table %d. Table enabled with no valid entries",
+                           DwellId);
+      }
+
    } /* End table ID loop */
 
    return RetStatus;
@@ -443,7 +494,7 @@ static void WriteDwellTable(osal_id_t FileHandle, uint16 id)
    char   DumpRecord[256];
    MEM_DWELL_TBL_Dwell_t *DwellTblPtr;
 
-   DwellTblPtr = MEM_DWELL_TBL_PTR(MemDwellTbl->Dwell,id);
+   DwellTblPtr = MEM_DWELL_VAR_PTR(MemDwellTbl->Dwell,id);
    
    sprintf(DumpRecord,"      {\n         \"id\": %d,\n         \"name\": \"%s\",\n         \"topic-id\": %d,\n         \"enabled\": \"%s\",\n         \"entry\": [\n",
            id, DwellTblPtr->Name, DwellTblPtr->TopicId, DwellTblPtr->EnaStr);
