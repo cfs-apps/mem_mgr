@@ -1,7 +1,7 @@
 { "app": {
    
    "title": "MEM_MGR",
-   "version": "2.0.0",
+   "version": "3.1.0",
    "bc-app-spec": "bc-app-spec-v3.0",
    "supplier": "bitValence",
    "url": "https://github.com/cfs-apps/mem_mgr",
